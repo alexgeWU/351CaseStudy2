@@ -14,34 +14,21 @@
 
 close all; clear; clc;
 
-%% ========================================================================
-%  SHARED PARAMETERS  (used across all tasks)
+%%
 
-tau     = 1.0;          % Fluorescence lifetime [ns]
-T_L     = 12.5;         % Laser repetition period [ns]  (80 MHz rep rate)
-f_L     = 1 / T_L;      % Laser frequency [GHz]
-omega_L = 2*pi * f_L;   % Angular frequency [rad/ns]
+% Parameters 
+tau     = 1e-9;         % Fluorescence lifetime
+T_L     = 12.5e-9;      % Laser period 
+f_L     = 1 / T_L;      % Laser frequency 
+omega_L = 2*pi * f_L;   % Laser angular frequency 
+T_S     = 0.2e-9;       % ADC sampling period [ns]
 
-% Task 1 ADC parameters
-T_S = 0.2;              % Fast ADC sampling period [ns]  (5 GS/s)
+%% Task 1
+% *Part a* 
 
-%% =========================================================================
-%  TASK 1a: Time-Domain Signals
-%
-%  Simulate the full signal chain over 5 laser periods:
-%    x(t)  — pulsed excitation (impulse train)
-%    h_f   — fluorescence impulse response  exp(-t/tau)*u(t)
-%    f(t)  — emitted fluorescence = x(t) * h_f(t)
-%    h_d   — detector IRF  exp(-(t-t0)/sigma_t)*u(t-t0)
-%    d(t)  — detector output = f(t) * h_d(t)
-%    y[n]  — ADC samples of d(t) at period T_S
-% =========================================================================
+t = 0 : T_S : 5*T_L - T_S;   
 
-t = 0 : T_S : 5*T_L - T_S;   % Time vector [ns], length = 5*T_L/T_S samples
-
-% --- Excitation: impulse train at t = 0, T_L, 2*T_L, ... ---
-% A delta function is approximated as a spike of height 1/T_S so that
-% the discrete-time sum equals 1 (unit area per impulse).
+% Create excitation impulse train
 x = zeros(size(t));
 for k = 0 : floor(5*T_L / T_L) - 1
     idx = round(k * T_L / T_S) + 1;
@@ -50,132 +37,105 @@ for k = 0 : floor(5*T_L / T_L) - 1
     end
 end
 
-% --- Fluorescence IRF: h_f(t) = exp(-t/tau), t >= 0 ---
-% Length chosen so that the tail decays to < 1% of peak before truncation.
-t_irf = 0 : T_S : 5*T_L;
-h_f   = exp(-t_irf / tau);     % Single-exponential decay, causal (u(t) implicit)
+% Fluorescence IRF 
+h_f = exp(-t / tau);     
 
-% --- Emitted fluorescence: f(t) = x(t) convolved with h_f(t) ---
-% conv() * T_S approximates the continuous convolution integral.
+% Calculate emitted fluorescence
 f_full = conv(x, h_f) * T_S;
-f      = f_full(1 : length(t));
+f = f_full(1 : length(t));
 
-% --- Detector IRF: h_d(t) = exp(-(t - t0)/sigma_t) * u(t - t0) ---
-sigma_t = 0.3;   % Detector temporal width [ns]  (fast PMT ~300 ps)
-t0      = 1.0;   % Detector time delay [ns]
-h_d = zeros(size(t_irf));
-mask = (t_irf >= t0);
-h_d(mask) = exp(-(t_irf(mask) - t0) / sigma_t);   % Zero before t0 (causal)
+% Detector IRF
+sigma_t = 0.3e-9;   % Detector temporal width [ns]  (fast PMT ~300 ps)
+t0 = 1e-9;     % Detector time delay [ns]
+h_d = zeros(size(t));
+mask = (t >= t0);
+h_d(mask) = exp(-(t(mask) - t0) / sigma_t);   % Zero before t0 (causal)
 
-% --- Detector output: d(t) = f(t) convolved with h_d(t) ---
+% Detector output
 d_full = conv(f, h_d) * T_S;
-d      = d_full(1 : length(t));
+d = d_full(1 : length(t));
 
-% --- Sampled signal y[n]: t is already on a T_S grid, so y[n] = d(t) ---
+% Sampled signal y[n]: t is already on a T_S grid, so y[n] = d(t) 
 y = d;
 
-% ---- Figure 1: Task 1a ----
+% Plot functions
 fig1 = figure('Name','Task 1a: Time-Domain Signals','NumberTitle','off', ...
               'Position',[50 50 900 750]);
 
 subplot(5,1,1);
 stem(t, x * T_S, 'filled', 'MarkerSize', 5, 'Color', [0.2 0.4 0.8]);
-xlabel('Time (ns)'); ylabel('x(t)');
+xlabel('Time (s)'); ylabel('x(t)');
 title('Excitation x(t): Impulse Train at 80 MHz'); grid on;
 
 subplot(5,1,2);
 plot(t, f, 'b', 'LineWidth', 1.5);
-xlabel('Time (ns)'); ylabel('f(t)');
+xlabel('Time (s)'); ylabel('f(t)');
 title(sprintf('Emitted Fluorescence f(t): Single-Exp Decay, \\tau = %.1f ns', tau));
 grid on;
 
 subplot(5,1,3);
-plot(t_irf, h_d, 'r', 'LineWidth', 1.5);
-xlabel('Time (ns)'); ylabel('h_d(t)');
+plot(t, h_d, 'r', 'LineWidth', 1.5);
+xlabel('Time (s)'); ylabel('h_d(t)');
 title(sprintf('Detector IRF h_d(t): \\sigma_t = %.1f ns, t_0 = %.1f ns', sigma_t, t0));
 grid on;
 
 subplot(5,1,4);
 plot(t, d, 'Color', [0.1 0.6 0.1], 'LineWidth', 1.5);
-xlabel('Time (ns)'); ylabel('d(t)');
+xlabel('Time (s)'); ylabel('d(t)');
 title('Detector Output d(t) = f(t) * h_d(t)  (broadened by detector)'); grid on;
 
 subplot(5,1,5);
 stem(t, y, 'filled', 'MarkerSize', 2, 'Color', [0.6 0.1 0.6]);
-xlabel('Time (ns)'); ylabel('y[n]');
+xlabel('Time (s)'); ylabel('y[n]');
 title(sprintf('Sampled Signal y[n] at T_S = %.1f ns  (5 GS/s ADC)', T_S)); grid on;
 
 sgtitle('Task 1a: Time-Domain Signal Chain', 'FontSize', 13, 'FontWeight', 'bold');
 
-%% =========================================================================
-%  TASK 1b: Frequency Response H_f(jw) — Numerical vs. Theoretical
-%
-%  Theoretical (Laplace → Fourier, s = j*omega):
-%    H_f(s) = 1 / (1/tau + s)  =>  H_f(jw) = tau / (1 + j*omega*tau)
-%
-%  Magnitude:  |H_f| = tau / sqrt(1 + (omega*tau)^2)
-%  Phase:      angle(H_f) = -atan(omega * tau)   [radians]
-% =========================================================================
-
-% Use a long time window so the exponential fully decays before truncation.
-t_long   = 0 : T_S : 500;          % 500 ns window at 0.2 ns resolution
-h_f_long = exp(-t_long / tau);      % Fluorescence IRF
+%% 
+% *Part b*
 
 % Numerical frequency response via DFT
-N_long   = length(h_f_long);
-H_f_num  = fft(h_f_long) * T_S;    % Scale by T_S for continuous-FT approximation
-f_axis   = (0 : N_long-1) / (N_long * T_S);   % Frequency axis [GHz]
-
-% Keep only positive-frequency half (symmetric for real signals)
-half_N   = floor(N_long / 2);
-f_pos    = f_axis(1 : half_N);
-H_f_pos  = H_f_num(1 : half_N);
+N = length(h_f);
+H_f_num = fft(h_f) * T_S; % Scale by T_S for continuous-FT approximation
+f_axis = (0 : N-1) / (N * T_S);   
 
 % Theoretical frequency response at the same frequencies
-omega_pos   = 2*pi * f_pos;         % [rad/ns]
-H_f_theory  = tau ./ (1 + 1j * omega_pos * tau);
+omega_axis = 2*pi * f_axis;  
+H_f_theory = tau ./ (1 + 1j * omega_axis * tau);
 
-% ---- Figure 2: Task 1b ----
-fig2 = figure('Name','Task 1b: Frequency Response H_f(jw)','NumberTitle','off', ...
-              'Position',[50 50 900 550]);
+% Plot frequency responses
+fig2 = figure('Name','Task 1b: Frequency Response H_f(jw)', ...
+    'NumberTitle','off', 'Position',[50 50 900 550]);
 
 subplot(2,1,1);
-plot(f_pos, abs(H_f_pos),    'b-',  'LineWidth', 2.0); hold on;
-plot(f_pos, abs(H_f_theory), 'r--', 'LineWidth', 1.5);
+plot(f_axis, abs(H_f_num),    'b-',  'LineWidth', 2.0); hold on;
+plot(f_axis, abs(H_f_theory), 'r--', 'LineWidth', 1.5);
 xlabel('Frequency (GHz)'); ylabel('|H_f(j\omega)|');
 title('Magnitude — Numerical FFT vs. Theoretical \tau/(1+j\omega\tau)');
 legend('Numerical FFT', 'Theoretical');
-xlim([0, 2]); grid on;
+grid on;
 
 subplot(2,1,2);
-plot(f_pos, angle(H_f_pos)*180/pi,    'b-',  'LineWidth', 2.0); hold on;
-plot(f_pos, angle(H_f_theory)*180/pi, 'r--', 'LineWidth', 1.5);
+plot(f_axis, angle(H_f_num)*180/pi,    'b-',  'LineWidth', 2.0); hold on;
+plot(f_axis, angle(H_f_theory)*180/pi, 'r--', 'LineWidth', 1.5);
 xlabel('Frequency (GHz)'); ylabel('Phase (degrees)');
 title('Phase — Numerical FFT vs. Theoretical  \angle H_f = -atan(\omega\tau)');
 legend('Numerical FFT', 'Theoretical');
-xlim([0, 2]); ylim([-100, 10]); grid on;
+grid on;
 
 sgtitle('Task 1b: Fluorescence Frequency Response H_f(j\omega)', ...
         'FontSize', 13, 'FontWeight', 'bold');
 
-
-%% =========================================================================
-%  TASK 1c: Impact of Different Detector IRFs on y[n]
-%
-%  A slow detector (large sigma_t) blurs the fluorescence decay, making the
-%  measured lifetime appear longer.  Deconvolution of h_d from y[n] is
-%  needed to recover the true fluorescence IRF h_f (and thus true tau).
-%  The time delay t0 simply shifts the signal; it can be corrected by
-%  aligning the peak before fitting.
-% =========================================================================
+%% 
+% *Part C*
 
 % Three detector scenarios: fast, medium, slow
-sigma_vals = [0.1,  0.5,  2.0];    % Detector widths [ns]
-t0_vals    = [0.3,  1.0,  2.5];    % Time delays [ns]  (larger delay for slow det.)
-clrs       = {[0 0.4 1], [0.1 0.7 0.1], [0.8 0.1 0.1]};
-labels     = {'\sigma_t=0.1 ns (fast)',  ...
-              '\sigma_t=0.5 ns (medium)', ...
-              '\sigma_t=2.0 ns (slow)'};
+sigma_vals = [0.1e-9,  2.5e-9,  10.0e-9]; % Detector widths
+t0_vals = [0.3e-9,  1.0e-9,  2.5e-9];     % Time delays 
+colors = {[0 0.4 1], [0.1 0.7 0.1], [0.8 0.1 0.1]};
+labels = {'\sigma_t=0.1 ns (fast)',  ...
+          '\sigma_t=2.5 ns (medium)', ...
+           '\sigma_t=10.0 ns (slow)'};
 
 fig3 = figure('Name','Task 1c: Detector IRF Impact','NumberTitle','off', ...
               'Position',[50 50 1100 600]);
@@ -188,44 +148,28 @@ for k = 1 : 3
 
     % Convolve fluorescence with this detector
     dk_full = conv(f, h_dk) * T_S;
-    dk      = dk_full(1 : length(t));
+    dk = dk_full(1 : length(t));
 
     % Top row: detector IRFs
     subplot(2, 3, k);
-    plot(t, h_dk, 'Color', clrs{k}, 'LineWidth', 1.8);
-    xlabel('Time (ns)'); ylabel('h_d(t)');
+    plot(t, h_dk, 'Color', colors{k}, 'LineWidth', 1.8);
+    xlabel('Time (s)'); ylabel('h_d(t)');
     title(labels{k}); grid on;
-    xlim([0, max(t)]);
 
     % Bottom row: resulting y[n]
     subplot(2, 3, k+3);
-    stem(t, dk, 'filled', 'MarkerSize', 2, 'Color', clrs{k});
-    xlabel('Time (ns)'); ylabel('y[n]');
-    title(sprintf('y[n]: \\sigma_t=%.1f ns, t_0=%.1f ns', sigma_vals(k), t0_vals(k)));
+    stem(t, dk, 'filled', 'MarkerSize', 2, 'Color', colors{k});
+    xlabel('Time (s)'); ylabel('y[n]');
+    title(sprintf('y[n]: \\sigma_t=%.1f ns, t_0=%.1f ns', ...
+        sigma_vals(k) * 10^9, t0_vals(k) * 10^9));
     grid on;
-    xlim([0, max(t)]);
 end
 
-sgtitle({'Task 1c: Detector IRF Impact on y[n]', ...
-         'Broader detector blurs decay \Rightarrow overestimates \tau; deconvolution required'}, ...
-        'FontSize', 12, 'FontWeight', 'bold');
+sgtitle({'Detector IRF Impact on y[n]'}, 'FontSize', 12, ...
+    'FontWeight', 'bold');
 
-
-%% =========================================================================
-%  TASK 2a: Why 100 kHz Cannot Recover Fluorescence Lifetime
-%
-%  Excitation: x(t) = 1 + cos(omega_L * t),  f_L = 80 MHz
-%  Fluorescence for single exponential (no IRFs):
-%    f(t) = 1 + M*cos(omega_L*t + phi)
-%  where:
-%    M   = 1 / sqrt(1 + (omega_L * tau)^2)   [modulation depth]
-%    phi = -atan(omega_L * tau)               [phase shift, radians]
-%
-%  Nyquist for 100 kHz ADC = 50 kHz << 80 MHz => severe aliasing.
-%  The 80 MHz signal folds to an alias whose frequency depends on the
-%  ratio 80 MHz / 100 kHz = 800, giving NO usable phase information.
-% =========================================================================
-
+%% Task 2
+% *Part a*
 f_L_hz     = 80e6;                       % 80 MHz [Hz]
 omega_L_hz = 2*pi * f_L_hz;             % [rad/s]
 tau_s      = tau * 1e-9;                 % Convert ns -> s for Hz-domain math
@@ -271,6 +215,20 @@ legend('True f(t)', '100 kHz samples'); grid on; xlim([0, 0.5]);
 
 sgtitle('Task 2a: 100 kHz Sampling Cannot Recover 80 MHz Phase', ...
         'FontSize', 12, 'FontWeight', 'bold');
+
+%  TASK 2a: Why 100 kHz Cannot Recover Fluorescence Lifetime
+%
+%  Excitation: x(t) = 1 + cos(omega_L * t),  f_L = 80 MHz
+%  Fluorescence for single exponential (no IRFs):
+%    f(t) = 1 + M*cos(omega_L*t + phi)
+%  where:
+%    M   = 1 / sqrt(1 + (omega_L * tau)^2)   [modulation depth]
+%    phi = -atan(omega_L * tau)               [phase shift, radians]
+%
+%  Nyquist for 100 kHz ADC = 50 kHz << 80 MHz => severe aliasing.
+%  The 80 MHz signal folds to an alias whose frequency depends on the
+%  ratio 80 MHz / 100 kHz = 800, giving NO usable phase information.
+% =========================================================================
 
 
 %% =========================================================================
