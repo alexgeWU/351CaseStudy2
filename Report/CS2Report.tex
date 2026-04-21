@@ -39,58 +39,217 @@ age@wustl.edu}
 \maketitle
 
 \begin{abstract}
-This project presents ...
+
 \end{abstract}
 
-
 \section{Background}
-Natural phenomena are often quantized and analyzed through the use of systems and other mathematical models: the modeling of fluorescence is a compelling example of such modeling. Although light is an inherently complex electromagnetic phenomenon, its behaviors can be modeled using frameworks discussed in our studies of signals and systems. Specifically, excitations of photons can be represented by impulses, and a general system for studying fluorescence lifetime imaging microscopy (FLIM) is born from a few continuous-time convolutions and multiplications. Through this perspective, fluorescence is not only observable but analytically solvable, allowing techniques from linear time-invariant system theory to be applied directly to real physical processes.
 
+Natural phenomena are often quantized and analyzed through the use of
+systems and other mathematical models: the modeling of fluorescence is a
+compelling example of such modeling.
+Although light is an inherently complex electromagnetic phenomenon, its
+behaviors can be modeled using frameworks discussed in our studies of
+signals and systems.
+Specifically, excitations of photons can be represented by impulses, and
+a general system for studying fluorescence lifetime imaging microscopy
+(FLIM) is born from a few continuous-time convolutions and
+multiplications.
+Through this perspective, fluorescence is not only observable but
+analytically solvable, allowing techniques from linear time-invariant
+system theory to be applied directly to real physical processes.
 
+In the fluorescence process, a fluorophore absorbs optical energy from
+an excitation source $x(t)$, exciting an electron to a higher energy
+state.
+After a brief delay, a photon of slightly lower energy is emitted as the
+electron relaxes.
+The probability density of this delay follows an exponential decay, so
+the fluorescence impulse response function (IRF) is:
+
+\begin{equation}
+    h_f(t) = e^{-t/\tau}\,u(t),
+    \label{eq:hf}
+\end{equation}
+
+where $\tau$ is the fluorescence lifetime and $u(t)$ is the unit step.
+The lifetime $\tau$ encodes information about the fluorophore's
+nanoscale environment---local temperature, pH, ion concentration, and
+protein interactions---and typically falls in the picosecond-to-nanosecond
+range~\cite{Datta2020}.
+Fluorescence lifetime imaging microscopy (FLIM) measures $\tau$ at
+every pixel of a field of view, producing a spatially-resolved map of
+biochemical state.
+
+The emitted fluorescence $f(t)$ is collected by a photomultiplier
+tube (PMT) with its own impulse response $h_d(t)$, then sampled by an
+ADC at period $T_S$.
+Depending on the available hardware, lifetime information can be
+extracted from time-domain exponential fitting, frequency-domain phase
+and modulation analysis, or the phasor approach explored in this
+study~\cite{Gadella1993,Digman2008}.
 
 \section{Methods}
-\subsection{Task 1}
 
-\subsection{Task 2}
+\subsection{Task 1: Fast Time-Domain Detection}
 
-\subsection{Task 3}
 
+\subsection{Task 2: Heterodyne Detection}
+
+
+
+\subsection{Task 3: Phasor Analysis}
+
+\subsubsection{Phasor Component Derivation}
+\label{sec:phasor_deriv}
+
+Phasor analysis projects the fluorescence decay onto cosine and sine
+basis functions at $\omega_L$, yielding two scalar
+coordinates~\cite{Digman2008}:
+
+\begin{align}
+    g &= \frac{\displaystyle\int_{\langle T_L \rangle}
+               h_f(t)\,\cos(\omega_L t)\,dt}
+              {\displaystyle\int_{\langle T_L \rangle}
+               h_f(t)\,dt},
+    \label{eq:g_def}
+    \\[4pt]
+    s &= \frac{\displaystyle\int_{\langle T_L \rangle}
+               h_f(t)\,\sin(\omega_L t)\,dt}
+              {\displaystyle\int_{\langle T_L \rangle}
+               h_f(t)\,dt}.
+    \label{eq:s_def}
+\end{align}
+
+For $h_f(t) = e^{-t/\tau}$ integrated from $0$ to $\infty$
+(valid when $T_L \gg \tau$, which holds here since $T_L=12.5\,\text{ns}$
+and $\tau=1\,\text{ns}$), the integrals evaluate analytically:
+
+\begin{align}
+    g &= \frac{1}{1 + (\omega_L\tau)^2},
+    \label{eq:g_analytic} \\[4pt]
+    s &= \frac{\omega_L\tau}{1 + (\omega_L\tau)^2}.
+    \label{eq:s_analytic}
+\end{align}
+
+Together, $g$ and $s$ are the real and imaginary parts of
+$H_f(j\omega_L)/\tau = 1/(1+j\omega_L\tau)$, so they encode the same
+phase and modulation information as heterodyne detection, but without
+requiring a reference channel.
+The lifetime is recovered as:
+
+\begin{equation}
+    \tau = \frac{s}{\omega_L\,g},
+    \label{eq:tau_phasor}
+\end{equation}
+
+which is self-consistent:
+$\tau = (\omega_L\tau)/[\omega_L\cdot 1] = \tau$. $\checkmark$
+
+\textbf{Physical interpretation.}
+$g$ (in-phase) is higher for \emph{shorter} lifetimes; as
+$\tau\to 0$, $g\to 1$.
+$s$ (quadrature) peaks when $\omega_L\tau = 1$, i.e.,
+$\tau = 1/(2\pi f_L) \approx 2\,\text{ns}$ at 80\,MHz; it vanishes
+for both very short and very long lifetimes.
+
+\textbf{Universal semicircle.}
+All single-exponential $(g,s)$ pairs satisfy
+$(g - \tfrac{1}{2})^2 + s^2 = \tfrac{1}{4}$, i.e.\ they lie on a
+semicircle of radius $\tfrac{1}{2}$ centered at $(\tfrac{1}{2},0)$.
+This follows from $g^2 + s^2 = g$, derived by adding
+Eqs.~\eqref{eq:g_analytic}--\eqref{eq:s_analytic} after rearrangement.
+Multi-exponential or mixed-species pixels fall \emph{inside} the
+semicircle at the intensity-weighted average of each species' coordinates.
+
+\subsubsection{Per-Pixel Implementation for FLIM Data}
 
 
 \section{Results}
-\subsection{Task 1}
 
-\subsection{Task 2}
-
-\subsection{Task 3}
+\subsection{Task 1: Fast Time-Domain Detection}
 
 
+\subsection{Task 2: Heterodyne Detection}
+
+
+\subsection{Task 3: Phasor Analysis}
+
+\subsubsection{Phasor Verification on Single-Exponential IRF}
+
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\linewidth]{figs/fig_phasor_diagram.png}
+    \caption{Phasor diagram for $\tau = 1\,\text{ns}$ at
+             $f_L = 80\,\text{MHz}$.
+             Theoretical (red circle) and numerical (blue cross) both
+             lie on the universal semicircle (black).
+             Shorter lifetimes appear near $(g,s) = (1,0)$; longer
+             lifetimes approach $(0,0)$.}
+    \label{fig:phasor_diagram}
+\end{figure}
+
+\subsubsection{Fluorescence Lifetime Image}
+
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\linewidth]{figs/fig_lifetime_image.png}
+    \caption{Per-pixel fluorescence lifetime map of NAD(P)H in breast
+             cancer cells ($512\times512$ pixels).
+             Color scale: $0$--$3\,\text{ns}$ (\texttt{jet} colormap).
+             Blue: free NAD(P)H; yellow--red: protein-bound NAD(P)H.}
+    \label{fig:lifetime_image}
+\end{figure}
+
+\subsubsection{Phasor Plot}
+
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\linewidth]{figs/fig_phasor_plot.png}
+    \caption{Pixelwise phasor plot (log-density, \texttt{hot} colormap).
+             White curve: universal semicircle; white circles: reference
+             lifetimes at $0.2$--$3.2\,\text{ns}$.
+             The cloud lies inside the semicircle, consistent with
+             multi-exponential (mixed free/bound) NAD(P)H.}
+    \label{fig:phasor_plot}
+\end{figure}
 
 
 \section{Conclusion}
 
 
+\begin{thebibliography}{00}
 
+\bibitem{Datta2020}
+R. Datta, T. M. Heaster, J. T. Sharick, A. A. Gillette, and M. C. Skala,
+``Fluorescence lifetime imaging microscopy: fundamentals and advances in
+instrumentation, analysis, and applications,''
+\textit{J. Biomed. Opt.}, vol.~25, no.~7, pp.~1--43, May 2020.
 
+\bibitem{Gadella1993}
+T. W. J. Gadella, T. M. Jovin, and R. M. Clegg,
+``Fluorescence lifetime imaging microscopy: pixel-by-pixel analysis of
+time-resolved fluorescence images,''
+\textit{Biophys. Chem.}, vol.~48, no.~2, pp.~221--239, 1993.
 
+\bibitem{Digman2008}
+M. A. Digman, V. R. Caiolfa, M. Zamai, and E. Gratton,
+``The phasor approach to fluorescence lifetime imaging analysis,''
+\textit{Biophys. J.}, vol.~94, no.~2, pp.~L14--L16, Jan. 2008.
 
+\bibitem{Sorrells2021}
+J. E. Sorrells, E. M. Martin, E. Aksamitiene \textit{et al.},
+``Label-free characterization of single extracellular vesicles using
+two-photon fluorescence lifetime imaging microscopy of {NAD(P)H},''
+\textit{Sci. Rep.}, vol.~11, p.~3308, 2021.
 
-
-
-
+\end{thebibliography}
 
 \clearpage
 \onecolumn
 \appendices
-
-\section{II. Methods}
-
-
-
-
-
-
-
 
 
 \end{document}
