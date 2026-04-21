@@ -170,26 +170,24 @@ sgtitle({'Detector IRF Impact on y[n]'}, 'FontSize', 12, ...
 
 %% Task 2
 % *Part a*
-f_L_hz     = 80e6;                       % 80 MHz [Hz]
-omega_L_hz = 2*pi * f_L_hz;             % [rad/s]
-tau_s      = tau * 1e-9;                 % Convert ns -> s for Hz-domain math
+f_L_hz     = 100e6;               % Laser modulation frequency
+omega_L_hz = 2*pi * f_L_hz;      
 
 % Modulation depth and phase of the fluorescence
-M_theory   = 1 / sqrt(1 + (omega_L_hz * tau_s)^2);
-phi_theory = -atan(omega_L_hz * tau_s);  % [rad]
+M_theory   = 1 / sqrt(1 + (omega_L_hz * tau)^2);
+phi_theory = -atan(omega_L_hz * tau);  % rad
 
-fprintf('\n=== Task 2a ===\n');
 fprintf('Laser frequency       f_L  = %g MHz\n', f_L_hz/1e6);
 fprintf('Modulation depth      M    = %.4f\n', M_theory);
 fprintf('Phase shift           phi  = %.4f rad = %.2f deg\n', ...
         phi_theory, phi_theory*180/pi);
-fprintf('100 kHz Nyquist             = 50 kHz << 80 MHz  => ALIASED\n');
+fprintf('100 kHz Nyquist             = 50 kHz << 100 MHz  => ALIASED\n');
 fprintf('Conclusion: slow sampling loses phase => cannot estimate tau\n\n');
 
 % Show aliasing visually over a 0.5 µs window
-T_S_slow  = 1 / 100e3;                  % 10 µs per sample
-t_fast_s  = 0 : 1e-10 : 5e-7;          % 0.5 µs at 10 GHz (true signal)
-t_slow_s  = 0 : T_S_slow : 5e-7;       % 100 kHz samples
+T_S_slow  = 1e-5;                      % 10 µs per sample
+t_fast_s  = 0 : 1e-10 : 5e-5;          % 0.5 µs at 10 GHz (true signal)
+t_slow_s  = 0 : T_S_slow : 5e-5;       % 100 kHz samples
 
 x_fast    = 1 + cos(omega_L_hz * t_fast_s);
 f_fast    = 1 + M_theory * cos(omega_L_hz * t_fast_s + phi_theory);
@@ -204,32 +202,18 @@ plot(t_fast_s*1e6, x_fast, 'b', 'LineWidth', 1); hold on;
 stem(t_slow_s*1e6, x_slow_s, 'r', 'filled', 'MarkerSize', 7);
 xlabel('Time (\mus)'); ylabel('Amplitude');
 title('Excitation x(t): True 80 MHz vs. 100 kHz Samples (aliased)');
-legend('True x(t)', '100 kHz samples'); grid on; xlim([0, 0.5]);
+legend('True x(t)', '100 kHz samples'); grid on; xlim([0, 10]);
 
 subplot(2,1,2);
 plot(t_fast_s*1e6, f_fast, 'b', 'LineWidth', 1); hold on;
 stem(t_slow_s*1e6, f_slow_s, 'r', 'filled', 'MarkerSize', 7);
 xlabel('Time (\mus)'); ylabel('Amplitude');
 title('Fluorescence f(t): 80 MHz aliases at 100 kHz => phase info destroyed');
-legend('True f(t)', '100 kHz samples'); grid on; xlim([0, 0.5]);
+legend('True f(t)', '100 kHz samples'); grid on; 
+xlim([0, 50]);
 
 sgtitle('Task 2a: 100 kHz Sampling Cannot Recover 80 MHz Phase', ...
         'FontSize', 12, 'FontWeight', 'bold');
-
-%  TASK 2a: Why 100 kHz Cannot Recover Fluorescence Lifetime
-%
-%  Excitation: x(t) = 1 + cos(omega_L * t),  f_L = 80 MHz
-%  Fluorescence for single exponential (no IRFs):
-%    f(t) = 1 + M*cos(omega_L*t + phi)
-%  where:
-%    M   = 1 / sqrt(1 + (omega_L * tau)^2)   [modulation depth]
-%    phi = -atan(omega_L * tau)               [phase shift, radians]
-%
-%  Nyquist for 100 kHz ADC = 50 kHz << 80 MHz => severe aliasing.
-%  The 80 MHz signal folds to an alias whose frequency depends on the
-%  ratio 80 MHz / 100 kHz = 800, giving NO usable phase information.
-% =========================================================================
-
 
 %% =========================================================================
 %  TASK 2b: Heterodyne Detection
