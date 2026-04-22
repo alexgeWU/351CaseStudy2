@@ -175,7 +175,16 @@ semicircle at the intensity-weighted average of each species' coordinates.
 \subsection{Task 3: Phasor Analysis}
 
 \subsubsection{Phasor Verification on Single-Exponential IRF}
-
+Fig.~\ref{fig:phasor_diagram} shows the phasor diagram for
+$\tau = 1\,\text{ns}$ at $f_L = 80\,\text{MHz}$.
+The analytical values from Eqs.~\eqref{eq:g_analytic}--\eqref{eq:s_analytic}
+are $g = 0.7982$, $s = 0.4012$, and $\tau_\text{phasor} = 1.000\,\text{ns}$.
+Numerical integration over $[0,T_L]$ by the trapezoidal rule gives
+$g = 0.7982$, $s = 0.4012$, in excellent agreement.
+Both points lie precisely on the universal semicircle, and reference
+lifetime markers from $0.2$ to $8\,\text{ns}$ are annotated along the
+curve, confirming the expected monotonic relationship between lifetime
+and angular position on the semicircle.
 
 \begin{figure}[!t]
     \centering
@@ -191,6 +200,21 @@ semicircle at the intensity-weighted average of each species' coordinates.
 
 \subsubsection{Fluorescence Lifetime Image}
 
+Fig.~\ref{fig:lifetime_image} shows the per-pixel lifetime map of the
+breast cancer cell dataset, color-scaled to $[0,3]\,\text{ns}$.
+The image reveals substantial spatial heterogeneity consistent with
+co-existing free and protein-bound NAD(P)H populations.
+Regions with shorter lifetimes ($\tau \lesssim 0.5\,\text{ns}$, blue)
+are consistent with \emph{free} NAD(P)H, which has a reported solution
+lifetime of $0.3$--$0.5\,\text{ns}$~\cite{Datta2020}.
+Longer-lifetime regions ($\tau \sim 1$--$3\,\text{ns}$, yellow--red)
+correspond to \emph{protein-bound} NAD(P)H, whose lifetime is elongated
+by restricted molecular motion~\cite{Sorrells2021}.
+This spatial distribution of free-to-bound NAD(P)H reflects the local
+metabolic activity of the cells: a shift toward bound NAD(P)H indicates
+oxidative phosphorylation, while predominantly free NAD(P)H is
+characteristic of the aerobic glycolysis (Warburg effect) common in
+cancer cells.
 
 \begin{figure}[!t]
     \centering
@@ -204,6 +228,33 @@ semicircle at the intensity-weighted average of each species' coordinates.
 
 \subsubsection{Phasor Plot}
 
+Fig.~\ref{fig:phasor_plot} shows the pixelwise phasor plot as a
+log-scaled 2D density histogram overlaid with the universal semicircle.
+Several features are apparent.
+The pixel cloud lies \emph{inside} the semicircle, indicating that most
+pixels contain a mixture of free and bound NAD(P)H; for a two-species
+mixture, the phasor sits on the chord connecting the two pure-species
+points inside the semicircle.
+A high-density cluster near $(g \approx 0.95,\,s \approx 0.10)$
+corresponds to free NAD(P)H ($\tau \approx 0.3$--$0.5\,\text{ns}$),
+while a lower-density tail toward $(g \approx 0.65,\,s \approx 0.38)$
+indicates protein-bound NAD(P)H ($\tau \approx 1$--$2\,\text{ns}$).
+A small fraction of pixels fall just outside the semicircle due to
+shot noise and the finite integration window bias for long lifetimes.
+
+Phasor analysis provides two key practical advantages over
+pixel-by-pixel exponential fitting.
+First, it is non-iterative---requiring only two dot products per pixel
+(Eqs.~\eqref{eq:g_discrete}--\eqref{eq:s_discrete})---and scales
+trivially to megapixel images.
+Second, the 2D phasor plot can be used as a segmentation tool: drawing
+a region-of-interest on the phasor and back-projecting to the image
+isolates pixels with a specific biochemical state without any additional
+fitting.
+One limitation is that the single-frequency phasor yields a
+\emph{phase-weighted mean} lifetime rather than resolving individual
+components; separating two species would require multi-harmonic analysis
+or global fitting~\cite{Gadella1993}.
 
 \begin{figure}[!t]
     \centering
@@ -215,6 +266,7 @@ semicircle at the intensity-weighted average of each species' coordinates.
              multi-exponential (mixed free/bound) NAD(P)H.}
     \label{fig:phasor_plot}
 \end{figure}
+
 
 
 \section{Conclusion}
