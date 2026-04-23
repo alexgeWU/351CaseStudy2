@@ -41,3 +41,5 @@ codegen/
 *.sbproj.bak
 
 .DS_Store
+
+.vscode/

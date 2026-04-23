@@ -57,7 +57,7 @@ d_full = conv(f, h_d) * dt;
 d = d_full(1 : length(t));
 
 % Analog-to-Digital Conversion
-step_size  = round(T_S / dt); % Ratio is exactly 20
+step_size  = round(T_S / dt);
 y_n        = d(1 : step_size : end);
 t_discrete = t(1 : step_size : end); % Time vector for plotting the discrete points
 
