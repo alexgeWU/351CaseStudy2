@@ -39,7 +39,26 @@ age@wustl.edu}
 \maketitle
 
 \begin{abstract}
-
+This paper presents an analysis of fluorescence
+lifetime imaging microscopy (FLIM) through three interconnected tasks.
+In Task~1, the full pulsed-excitation detection chain---impulse-train
+excitation, single-exponential fluorescence decay, PMT convolution, and
+ADC sampling---is simulated at $T_S = 0.2\,\text{ns}$, and the
+fluorescence frequency response $H_f(j\omega) = \tau/(1+j\omega\tau)$
+is verified numerically against its Laplace-domain derivation.
+The impact of detector temporal width on the measured decay is
+characterized, motivating deconvolution for slow detectors.
+In Task~2, we demonstrate that direct 100\,kHz sampling of an
+80\,MHz fluorescence signal is impossible due to aliasing, then show
+that heterodyne mixing to a 1\,kHz intermediate frequency recovers
+the original phase shift and modulation depth, yielding an estimated
+lifetime of $\tau \approx 1\,\text{ns}$ from both observables.
+In Task~3, phasor analysis is derived analytically and applied
+pixel-by-pixel to a $512\times512$ TCSPC dataset of NAD(P)H in breast
+cancer cells, producing a spatially-resolved lifetime image and a phasor
+plot that separates free NAD(P)H ($\tau \lesssim 0.5\,\text{ns}$) from
+protein-bound NAD(P)H ($\tau \sim 1$--$3\,\text{ns}$), reflecting the
+metabolic heterogeneity of the cell population.
 \end{abstract}
 
 \section{Background}
@@ -271,6 +290,30 @@ or global fitting~\cite{Gadella1993}.
 
 \section{Conclusion}
 
+This study applied LTI system theory to three distinct fluorescence
+lifetime measurement scenarios, each illustrating a different
+relationship between physical signal processing and biological
+information extraction.
+In the time domain, the convolution chain faithfully reproduced the
+pulsed-FLIM signal; the detector IRF was identified as the dominant
+source of lifetime overestimation when $\sigma_t$ is comparable to
+$\tau$, requiring deconvolution to recover the true decay.
+Heterodyne detection resolved the 80\,MHz
+fluorescence signal being undetectable by a 100\,kHz ADC by mixing
+to a 1\,kHz beat frequency, both the phase shift
+$\Delta\varphi = -\arctan(\omega_L\tau)$ and modulation depth
+$M = 1/\sqrt{1+(\omega_L\tau)^2}$ were preserved, independently
+recovering $\tau = 1\,\text{ns}$ with high accuracy.
+Phasor analysis unified the frequency-domain perspective into a
+two-coordinate representation that scales efficiently to imaging
+data; applied to real NAD(P)H TCSPC measurements, it produced a
+lifetime map distinguishing free from protein-bound populations and a
+phasor plot whose interior cloud directly encodes the metabolic state of individual cells
+without a single iterative fit.
+Together, the three tasks demonstrate that the mathematics of
+convolution, Fourier analysis, and inner-product projections are not
+merely abstract tools but the direct computational substrate of
+modern biomedical imaging.
 
 \begin{thebibliography}{00}
 
