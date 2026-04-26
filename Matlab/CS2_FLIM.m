@@ -22,18 +22,19 @@ T_L     = 12.5e-9;      % Laser period
 f_L     = 1 / T_L;      % Laser frequency 
 omega_L = 2*pi * f_L;   % Laser angular frequency 
 T_S     = 0.2e-9;       % ADC sampling period [ns]
+dt      = 0.001e-9;      % small DT to simulate CT
 
 %% Task 1
 % *Part a* 
 
-t = 0 : T_S : 5*T_L - T_S;   
+t = 0 : dt : 10*T_L - dt;   
 
 % Create excitation impulse train
 x = zeros(size(t));
-for k = 0 : floor(5*T_L / T_L) - 1
-    idx = round(k * T_L / T_S) + 1;
+for k = 0 : 9
+    idx = round(k * T_L / dt) + 1;
     if idx <= length(t)
-        x(idx) = 1 / T_S;
+        x(idx) = 1 / dt;
     end
 end
 
@@ -41,53 +42,63 @@ end
 h_f = exp(-t / tau);     
 
 % Calculate emitted fluorescence
-f_full = conv(x, h_f) * T_S;
+f_full = conv(x, h_f) * dt;
 f = f_full(1 : length(t));
 
 % Detector IRF
 sigma_t = 0.3e-9;   % Detector temporal width [ns]  (fast PMT ~300 ps)
-t0 = 1e-9;     % Detector time delay [ns]
-h_d = zeros(size(t));
-mask = (t >= t0);
-h_d(mask) = exp(-(t(mask) - t0) / sigma_t);   % Zero before t0 (causal)
+t0      = 1e-9;     % Detector time delay [ns]
+h_d     = zeros(size(t));
+mask    = (t >= t0);
+h_d(mask) = exp(-(t(mask) - t0).^2 / sigma_t^2);   % Zero before t0 (causal)
 
 % Detector output
-d_full = conv(f, h_d) * T_S;
+d_full = conv(f, h_d) * dt;
 d = d_full(1 : length(t));
 
-% Sampled signal y[n]: t is already on a T_S grid, so y[n] = d(t) 
-y = d;
+% Analog-to-Digital Conversion
+step_size  = round(T_S / dt);
+y_n        = d(1 : step_size : end);
+t_discrete = t(1 : step_size : end); % Time vector for plotting the discrete points
 
 % Plot functions
 fig1 = figure('Name','Task 1a: Time-Domain Signals','NumberTitle','off', ...
               'Position',[50 50 900 750]);
-
+% Excitation
 subplot(5,1,1);
-stem(t, x * T_S, 'filled', 'MarkerSize', 5, 'Color', [0.2 0.4 0.8]);
-xlabel('Time (s)'); ylabel('x(t)');
-title('Excitation x(t): Impulse Train at 80 MHz'); grid on;
+stem(t * 1e9, x * dt, 'filled', 'MarkerSize', 4, 'Color', [0.2 0.4 0.8]);
+xlabel('Time (ns)'); ylabel('x(t)');
+title('Excitation x(t): Impulse Train at 80 MHz');
+grid on; xlim([0,120]);
 
+% Emission
 subplot(5,1,2);
-plot(t, f, 'b', 'LineWidth', 1.5);
-xlabel('Time (s)'); ylabel('f(t)');
-title(sprintf('Emitted Fluorescence f(t): Single-Exp Decay, \\tau = %.1f ns', tau));
-grid on;
+plot(t * 1e9, f, 'b', 'LineWidth', 1.5);
+xlabel('Time (ns)'); ylabel('f(t)');
+title(sprintf('Emitted Fluorescence f(t): Single-Exp Decay, \\tau = %.1f ns', tau * 1e9));
+grid on; xlim([0,120]);
 
+% Continuous Detector Output
 subplot(5,1,3);
-plot(t, h_d, 'r', 'LineWidth', 1.5);
-xlabel('Time (s)'); ylabel('h_d(t)');
-title(sprintf('Detector IRF h_d(t): \\sigma_t = %.1f ns, t_0 = %.1f ns', sigma_t, t0));
-grid on;
+plot(t * 1e9, d, 'Color', [0.1 0.6 0.1], 'LineWidth', 1.5);
+xlabel('Time (ns)'); ylabel('d(t)');
+title('Continuous Detector Output d(t) = f(t) * h_d(t)');
+grid on; xlim([0,120]);
 
+% Continuous Output
 subplot(5,1,4);
-plot(t, d, 'Color', [0.1 0.6 0.1], 'LineWidth', 1.5);
-xlabel('Time (s)'); ylabel('d(t)');
-title('Detector Output d(t) = f(t) * h_d(t)  (broadened by detector)'); grid on;
+plot(t * 1e9, d, 'Color', [0.6 0.1 0.6], 'LineWidth', 1.5);
+xlabel('Time (ns)'); ylabel('y[n]');
+title('Continuous Output y(t) = d(t)');
+grid on; xlim([0,120]);
 
+% Digitized Output
 subplot(5,1,5);
-stem(t, y, 'filled', 'MarkerSize', 2, 'Color', [0.6 0.1 0.6]);
-xlabel('Time (s)'); ylabel('y[n]');
-title(sprintf('Sampled Signal y[n] at T_S = %.1f ns  (5 GS/s ADC)', T_S)); grid on;
+% Overlay the continuous signal lightly behind the discrete samples
+stem(t_discrete * 1e9, y_n, 'filled', 'MarkerSize', 4, 'Color', [0.6 0.1 0.6]);
+xlabel('Time (ns)'); ylabel('y[n]');
+title(sprintf('Sampled Signal y[n] at T_S = %.1f ns  (5 GS/s ADC)', T_S * 1e9));
+grid on; xlim([0,120]);
 
 sgtitle('Task 1a: Time-Domain Signal Chain', 'FontSize', 13, 'FontWeight', 'bold');
 
