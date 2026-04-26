@@ -170,150 +170,145 @@ sgtitle({'Detector IRF Impact on y[n]'}, 'FontSize', 12, ...
 
 %% Task 2
 % *Part a*
-f_L_hz     = 100e6;               % Laser modulation frequency
+f_L_hz = 100e6;               % Laser modulation frequency
 omega_L_hz = 2*pi * f_L_hz;      
 
-% Modulation depth and phase of the fluorescence
-M_theory   = 1 / sqrt(1 + (omega_L_hz * tau)^2);
-phi_theory = -atan(omega_L_hz * tau);  % rad
-
-fprintf('Laser frequency       f_L  = %g MHz\n', f_L_hz/1e6);
-fprintf('Modulation depth      M    = %.4f\n', M_theory);
-fprintf('Phase shift           phi  = %.4f rad = %.2f deg\n', ...
-        phi_theory, phi_theory*180/pi);
-fprintf('100 kHz Nyquist             = 50 kHz << 100 MHz  => ALIASED\n');
-fprintf('Conclusion: slow sampling loses phase => cannot estimate tau\n\n');
-
 % Show aliasing visually over a 0.5 µs window
-T_S_slow  = 1e-5;                      % 10 µs per sample
-t_fast_s  = 0 : 1e-10 : 5e-5;          % 0.5 µs at 10 GHz (true signal)
-t_slow_s  = 0 : T_S_slow : 5e-5;       % 100 kHz samples
+T_S_slow = 1e-5;                      % 10 µs per sample
+T_S_fast = 1e-11;
+t_fast_s = 0 : T_S_fast : 2e-5;           % 0.5 µs at 1 GHz (true signal)
+t_slow_s = 0 : T_S_slow : 2e-5;       % 100 kHz samples
 
-x_fast    = 1 + cos(omega_L_hz * t_fast_s);
-f_fast    = 1 + M_theory * cos(omega_L_hz * t_fast_s + phi_theory);
-x_slow_s  = 1 + cos(omega_L_hz * t_slow_s);
-f_slow_s  = 1 + M_theory * cos(omega_L_hz * t_slow_s + phi_theory);
+% Compute the output of the ground truth using convolution
+x_fast = 1 + cos(omega_L_hz * t_fast_s);
+h_f_fast = 1 / tau * exp(-t_fast_s / tau);
+f_fast = conv(x_fast, h_f_fast) * T_S_fast;
+f_fast = f_fast(1 : length(t_fast_s));
 
-fig4 = figure('Name','Task 2a: Aliasing at 100 kHz','NumberTitle','off', ...
+% Sample slower frequency from ground truth
+step = round(T_S_slow / T_S_fast);
+f_slow = f_fast(1:step:end);
+
+% Calculate theoretical modulation depth and phase of the fluorescence
+M = 1 / sqrt(1 + (omega_L_hz * tau)^2);
+phi = -atan(omega_L_hz * tau); 
+
+% Create upper/lower bounds for visualization
+upper_bound = (1 + M) * ones(1, numel(t_fast_s));
+lower_bound = (1 - M) * ones(1, numel(t_fast_s));
+
+fig4 = figure('Name','Aliasing at 100 kHz','NumberTitle','off', ...
               'Position',[50 50 900 500]);
 
 subplot(2,1,1);
 plot(t_fast_s*1e6, x_fast, 'b', 'LineWidth', 1); hold on;
-stem(t_slow_s*1e6, x_slow_s, 'r', 'filled', 'MarkerSize', 7);
+stem(t_slow_s*1e6, x_slow, 'r', 'filled', 'MarkerSize', 7);
 xlabel('Time (\mus)'); ylabel('Amplitude');
-title('Excitation x(t): True 80 MHz vs. 100 kHz Samples (aliased)');
-legend('True x(t)', '100 kHz samples'); grid on; xlim([0, 10]);
+title('Excitation x(t): Ground Truth 100 MHz vs. Sampled 100 kHz');
+legend('True x(t)', '100 kHz samples'); grid on; xlim([0, 0.5]);
 
 subplot(2,1,2);
 plot(t_fast_s*1e6, f_fast, 'b', 'LineWidth', 1); hold on;
-stem(t_slow_s*1e6, f_slow_s, 'r', 'filled', 'MarkerSize', 7);
+stem(t_slow_s*1e6, f_slow, 'r', 'filled', 'MarkerSize', 7);
+plot(t_fast_s*1e6, upper_bound, 'LineWidth', 2, 'Color', 'green');
+plot(t_fast_s*1e6, lower_bound, 'LineWidth', 2, 'Color', 'green');
 xlabel('Time (\mus)'); ylabel('Amplitude');
-title('Fluorescence f(t): 80 MHz aliases at 100 kHz => phase info destroyed');
-legend('True f(t)', '100 kHz samples'); grid on; 
-xlim([0, 50]);
+title('Emission f(t)');
+legend('True f(t)', '100 kHz samples', 'Amplitude Bounds'); grid on; 
+xlim([0, 20]);
 
-sgtitle('Task 2a: 100 kHz Sampling Cannot Recover 80 MHz Phase', ...
-        'FontSize', 12, 'FontWeight', 'bold');
+sgtitle(['100 kHz Sampling vs. Ground Truth of 100 MHz Excitation ' ...
+    'and Emission Signals'], 'FontSize', 12, 'FontWeight', 'bold');
 
-%% =========================================================================
-%  TASK 2b: Heterodyne Detection
-%
-%  Multiply f(t) by g(t) = cos(omega_g * t) where omega_g is slightly
-%  offset from omega_L so a low-frequency "beat" falls within the
-%  100 kHz ADC bandwidth.
-%
-%  Mixing product (using trig identity):
-%    f(t)*g(t) ~ M/2 * cos((omega_L - omega_g)*t + phi) + high-freq terms
-%  where the beat frequency  delta_f = f_L - f_g  is << 50 kHz (Nyquist).
-%
-%  After a low-pass filter (LPF), only the beat survives.
-%  The beat PRESERVES the phase phi (and modulation M) of the fluorescence,
-%  so lifetime can be recovered via heterodyne comparison with the
-%  beat from a reference copy of the excitation.
-% =========================================================================
+%%
+% *Part b*
 
-delta_f   = 1e3;                         % Intermediate/beat frequency [Hz] = 1 kHz
-f_g_hz    = f_L_hz - delta_f;           % Mixer (heterodyne) frequency [Hz]
-omega_g   = 2*pi * f_g_hz;
+delta_f = 1e3;                         
+f_n_hz = f_L_hz - delta_f;           
+omega_n = 2*pi * f_n_hz;
 
-% Simulate using 1 µs time steps over 5 ms (many beat cycles).
-% 1 µs >> 1/80 MHz so the 80 MHz carrier is not resolved — that is fine;
-% we only need to track the envelope (beat), which is at 1 kHz.
-T_S_mid   = 1e-6;                        % 1 µs intermediate sampling [s]
-t_mid     = 0 : T_S_mid : 5e-3;         % 5 ms window
 
-f_mid     = 1 + M_theory * cos(omega_L_hz * t_mid + phi_theory);  % Fluorescence
-x_mid     = 1 + cos(omega_L_hz * t_mid);                          % Excitation
-g_mid     = cos(omega_g * t_mid);                                   % Mixer
+T_S_mid = 1e-6;                       % 1 µs intermediate sampling [s]
+t_mid = 0 : T_S_mid : 5e-3;         % 5 ms window
 
-det_f     = f_mid .* g_mid;     % Fluorescence after mixing
-det_x     = x_mid .* g_mid;     % Excitation after mixing (reference channel)
+f_mid = 1 + M * cos(omega_L_hz * t_mid + phi);  % Fluorescence
+x_mid = 1 + cos(omega_L_hz * t_mid);                          % Excitation
+g = cos(omega_n * t_mid);                                   % Mixer
 
-% LPF: zero out FFT bins above 2 kHz to isolate the beat
-N_mid     = length(t_mid);
-f_mid_ax  = (-N_mid/2 : N_mid/2-1) / (N_mid * T_S_mid);   % Centered freq axis [Hz]
-LPF_cut   = 2 * delta_f;   % 2 kHz cutoff
+% mixed_f = f_mid .* g;     % Fluorescence after mixing
+% mixed_x = x_mid .* g;     % Excitation after mixing (reference channel)
 
-F_det_f   = fftshift(fft(det_f));
-F_det_x   = fftshift(fft(det_x));
-lpf_mask  = (abs(f_mid_ax) <= LPF_cut);
+mixed_f_low = (M/2)*cos((omega_L - omega_n)*t_mid + phi);
+mixed_x_low = (1/2)*cos((omega_L - omega_n)*t_mid);
+y_f = mixed_f_low;
+y_x = mixed_x_low;
 
-y_beat_f  = real(ifft(ifftshift(F_det_f .* lpf_mask)));
-y_beat_x  = real(ifft(ifftshift(F_det_x .* lpf_mask)));
+% FFT setup
+N  = length(t_mid);
+fs = 1/T_S_mid;
+freq = (-N/2:N/2-1)*(fs/N);
 
-% ---- Figure 5: Task 2b — Time Domain ----
-fig5 = figure('Name','Task 2b: Heterodyne - Time Domain','NumberTitle','off', ...
-              'Position',[50 50 900 650]);
+% Low-pass filter around beat frequency
 
+LPF_cut = 2*delta_f;
+F_mixed_f = fftshift(fft(mixed_f));
+F_mixed_x = fftshift(fft(mixed_x));
+lpf_mask = abs(freq) <= LPF_cut;
+% Y_f = F_mixed_f .* lpf_mask;
+% Y_x = F_mixed_x .* lpf_mask;
+% y_f = real(ifft(ifftshift(Y_f)));
+% y_x = real(ifft(ifftshift(Y_x)));
+
+Y_f = fftshift(fft(y_f));
+Y_x = fftshift(fft(y_x));
+
+% Time-domain plots
+
+figure;
 subplot(3,1,1);
-plot(t_mid*1e3, f_mid, 'b', 'LineWidth', 0.6);
-xlabel('Time (ms)'); ylabel('f(t)'); grid on;
-title(sprintf('Fluorescence f(t) at %g MHz — oscillates too fast to sample', f_L_hz/1e6));
-
+plot(t_mid*1e3, g);
+xlabel('Time (ms)');
+ylabel('g(t)');
+title('Mixer Signal');
+grid on;
 subplot(3,1,2);
-plot(t_mid*1e3, det_f, 'Color',[0.1 0.6 0.1], 'LineWidth', 0.6);
-xlabel('Time (ms)'); ylabel('f(t) \cdot g(t)'); grid on;
-title(sprintf('After Mixing: f(t)\\cdotg(t), g at f_g = %g MHz', f_g_hz/1e6));
-
+plot(t_mid*1e3, mixed_f);
+xlabel('Time (ms)');
+ylabel('f_{det}(t)g(t)');
+title('After Mixing');
+grid on;
 subplot(3,1,3);
-plot(t_mid*1e3, y_beat_f, 'r',  'LineWidth', 1.8); hold on;
-plot(t_mid*1e3, y_beat_x, 'b--','LineWidth', 1.8);
-xlabel('Time (ms)'); ylabel('Amplitude'); grid on;
-title(sprintf('After LPF: Beat at \\Delta f = %g kHz — detectable at 100 kHz', delta_f/1e3));
-legend('Fluorescence beat','Excitation beat (ref)');
+plot(t_mid*1e3, y_f, 'LineWidth', 1.5); hold on;
+plot(t_mid*1e3, y_x, '--', 'LineWidth', 1.5);
+xlabel('Time (ms)');
+ylabel('Amplitude');
+title('After LPF: 1 kHz Beat Signal');
+legend('Fluorescence beat', 'Reference beat');
+grid on;
 
-sgtitle('Task 2b: Heterodyne Detection — Time Domain', ...
-        'FontSize', 12, 'FontWeight', 'bold');
-
-% ---- Figure 6: Task 2b — Frequency Domain ----
-fig6 = figure('Name','Task 2b: Heterodyne - Freq Domain','NumberTitle','off', ...
-              'Position',[50 50 900 650]);
-
+% Frequency-domain plots
+figure;
 subplot(3,1,1);
-F_f_mid = fftshift(fft(f_mid));
-plot(f_mid_ax/1e6, abs(F_f_mid)/N_mid, 'b', 'LineWidth', 1.2);
-xlabel('Frequency (MHz)'); ylabel('|F(\omega)|');
-title('Spectrum of f(t): peaks at \pm80 MHz');
-xlim([-200, 200]); grid on;
-
+plot(freq/1e3, abs(F_mixed_f)/N);
+xlabel('Frequency (kHz)');
+ylabel('|F_{mixed}(j\omega)|');
+title('Mixed Fluorescence Spectrum');
+xlim([-5 5]);
+grid on;
 subplot(3,1,2);
-plot(f_mid_ax/1e6, abs(F_det_f)/N_mid, 'Color',[0.1 0.6 0.1], 'LineWidth', 1.2);
-xlabel('Frequency (MHz)'); ylabel('|F(\omega)|');
-title(sprintf('After Mixing: peaks at f_L \\pm f_g = \\pm%g MHz and 0 MHz', ...
-              (f_L_hz + f_g_hz)/2/1e6));
-xlim([-200, 200]); grid on;
-
+plot(freq/1e3, abs(Y_f)/N, 'LineWidth', 1.5);
+xlabel('Frequency (kHz)');
+ylabel('|Y(j\omega)|');
+title('Magnitude of LPF Output');
+xlim([-5 5]);
+grid on;
 subplot(3,1,3);
-plot(f_mid_ax/1e3, abs(F_det_f .* lpf_mask)/N_mid, 'r',  'LineWidth', 1.8); hold on;
-plot(f_mid_ax/1e3, abs(F_det_x .* lpf_mask)/N_mid, 'b--','LineWidth', 1.8);
-xlabel('Frequency (kHz)'); ylabel('|Y(j\omega)|');
-title(sprintf('After LPF: Beat at \\pm%g kHz — within 100 kHz bandwidth', delta_f/1e3));
-legend('|Y_f(j\omega)|','|Y_x(j\omega)| (ref)');
-xlim([-5, 5]); grid on;
-
-sgtitle('Task 2b: Heterodyne Detection — Frequency Domain', ...
-        'FontSize', 12, 'FontWeight', 'bold');
-
+plot(freq/1e3, angle(Y_f));
+xlabel('Frequency (kHz)');
+ylabel('\angle Y(j\omega) [rad]');
+title('Phase of LPF Output');
+xlim([-5 5]);
+grid on;
 
 %% =========================================================================
 %  TASK 2c: Phase Shift and Modulation — Heterodyne Lifetime Estimation
@@ -333,8 +328,8 @@ sgtitle('Task 2b: Heterodyne Detection — Frequency Domain', ...
 T_S_100k  = 1 / 100e3;
 t_100k    = t_mid(1) : T_S_100k : t_mid(end);
 
-y_f_100k  = interp1(t_mid, y_beat_f, t_100k, 'linear', 0);
-y_x_100k  = interp1(t_mid, y_beat_x, t_100k, 'linear', 0);
+y_f_100k  = interp1(t_mid, y_f, t_100k, 'linear', 0);
+y_x_100k  = interp1(t_mid, y_x, t_100k, 'linear', 0);
 
 % Extract phase and amplitude at the beat frequency using DFT
 N_100k   = length(t_100k);
@@ -410,58 +405,151 @@ sgtitle('Task 2c: Heterodyne Lifetime Estimation', ...
 %    Together (g,s) lie on the universal semicircle of radius 0.5 centered at (0.5,0)
 % =========================================================================
 
-% Analytical phasor for tau = 1 ns, omega_L in rad/ns
-g_theory_3a = 1 / (1 + (omega_L * tau)^2);
-s_theory_3a = (omega_L * tau) / (1 + (omega_L * tau)^2);
-tau_from_phasor_theory = s_theory_3a / (omega_L * g_theory_3a);
+fs_adc = 100e3;                  % ADC sampling frequency [Hz]
 
-% Numerical phasor: integrate h_f over one period using trapezoidal rule
-t_phasor  = 0 : 0.001 : T_L;             % Fine grid [ns]
-h_f_p     = exp(-t_phasor / tau);         % IRF samples
+Ts_adc = 1/fs_adc;
 
-norm_hf   = trapz(t_phasor, h_f_p);
-g_num_3a  = trapz(t_phasor, h_f_p .* cos(omega_L * t_phasor)) / norm_hf;
-s_num_3a  = trapz(t_phasor, h_f_p .* sin(omega_L * t_phasor)) / norm_hf;
-tau_from_phasor_num = s_num_3a / (omega_L * g_num_3a);
+t_adc  = t_mid(1):Ts_adc:t_mid(end);
 
-fprintf('=== Task 3a: Phasor Verification (tau = %.1f ns) ===\n', tau);
-fprintf('Theoretical: g=%.4f  s=%.4f  tau=%.4f ns\n', ...
-        g_theory_3a, s_theory_3a, tau_from_phasor_theory);
-fprintf('Numerical:   g=%.4f  s=%.4f  tau=%.4f ns\n\n', ...
-        g_num_3a, s_num_3a, tau_from_phasor_num);
+yf_adc = interp1(t_mid, y_f, t_adc, 'linear');
 
-% Universal semicircle: all single-exponential lifetimes lie on this curve
-theta_sc = linspace(0, pi, 500);
-g_sc = 0.5 + 0.5*cos(theta_sc);
-s_sc = 0.5*sin(theta_sc);
+yx_adc = interp1(t_mid, y_x, t_adc, 'linear');
 
-% Mark several tau values on the semicircle for reference
-tau_marks = [0.2, 0.4, 0.8, 1.0, 2.0, 4.0, 8.0];
+% Extract phase and amplitude at the beat frequency
 
-fig8 = figure('Name','Task 3a: Phasor Diagram','NumberTitle','off', ...
-              'Position',[50 50 700 500]);
-plot(g_sc, s_sc, 'k-', 'LineWidth', 2); hold on;
+N = length(t_adc);
 
-for tm = tau_marks
-    g_tm = 1 / (1 + (omega_L*tm)^2);
-    s_tm = (omega_L*tm) / (1 + (omega_L*tm)^2);
-    plot(g_tm, s_tm, 'ko', 'MarkerSize', 6, 'MarkerFaceColor', [0.7 0.7 0.7]);
-    text(g_tm + 0.02, s_tm + 0.01, sprintf('%.1f ns', tm), 'FontSize', 8);
-end
+Yf = fft(yf_adc);
 
-plot(g_theory_3a, s_theory_3a, 'ro', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
-plot(g_num_3a,    s_num_3a,    'b+', 'MarkerSize', 12, 'LineWidth', 2.5);
+Yx = fft(yx_adc);
 
-xlabel('g  (in-phase component)', 'FontSize', 11);
-ylabel('s  (quadrature component)', 'FontSize', 11);
-title(sprintf('Phasor Diagram — \\tau = %.1f ns lies on the universal semicircle', tau), ...
-      'FontSize', 11);
-legend('Universal semicircle','Lifetime labels','Theoretical','Numerical', ...
-       'Location','northwest');
-grid on; axis equal; xlim([0, 1]); ylim([0, 0.6]);
+k = round(delta_f*N/fs_adc) + 1;  % MATLAB index for beat bin
 
-sgtitle('Task 3a: Phasor Components g and s', ...
-        'FontSize', 13, 'FontWeight', 'bold');
+phase_f = angle(Yf(k));
+
+phase_x = angle(Yx(k));
+
+delta_phi = angle(exp(1j*(phase_f - phase_x)));  % wrapped phase difference
+
+delta_M   = abs(Yf(k)) / abs(Yx(k));             % modulation ratio
+
+% Estimate lifetime
+
+tau_phase = -tan(delta_phi)/omega_L;                       % [s]
+
+tau_mod   = sqrt(max(0, 1/delta_M^2 - 1))/omega_L;          % [s]
+
+fprintf('=== Task 2c ===\n');
+
+fprintf('Delta phi = %.4f rad = %.2f deg\n', delta_phi, delta_phi*180/pi);
+
+fprintf('Delta M   = %.4f\n', delta_M);
+
+fprintf('Tau from phase      = %.4f ns\n', tau_phase*1e9);
+
+fprintf('Tau from modulation = %.4f ns\n', tau_mod*1e9);
+
+fprintf('True tau            = %.4f ns\n', tau*1e9);
+
+% Plot time-domain comparison
+
+figure;
+
+subplot(2,1,1);
+
+plot(t_adc*1e3, yx_adc, 'LineWidth', 1.5); hold on;
+
+plot(t_adc*1e3, yf_adc, 'LineWidth', 1.5);
+
+xlabel('Time (ms)');
+
+ylabel('Amplitude');
+
+title('Reference and Fluorescence Beat Signals');
+
+legend('Excitation reference', 'Fluorescence');
+
+grid on;
+
+% Plot frequency-domain magnitude
+
+f_ax = (0:N-1)*(fs_adc/N);
+
+subplot(2,1,2);
+
+plot(f_ax/1e3, abs(Yx)/N, 'LineWidth', 1.5); hold on;
+
+plot(f_ax/1e3, abs(Yf)/N, 'LineWidth', 1.5);
+
+xlabel('Frequency (kHz)');
+
+ylabel('Magnitude');
+
+title(sprintf('\\Delta\\phi = %.2f^\\circ, \\Delta M = %.3f, \\tau = %.3f ns', ...
+      delta_phi*180/pi, delta_M, tau_phase*1e9));
+
+legend('Excitation reference', 'Fluorescence');
+
+xlim([0 5]);
+
+grid on;
+
+
+
+
+
+% % Analytical phasor for tau = 1 ns, omega_L in rad/ns
+% g_theory_3a = 1 / (1 + (omega_L * tau)^2);
+% s_theory_3a = (omega_L * tau) / (1 + (omega_L * tau)^2);
+% tau_from_phasor_theory = s_theory_3a / (omega_L * g_theory_3a);
+% 
+% % Numerical phasor: integrate h_f over one period using trapezoidal rule
+% t_phasor  = 0 : 0.001 : T_L;             % Fine grid [ns]
+% h_f_p     = exp(-t_phasor / tau);         % IRF samples
+% 
+% norm_hf   = trapz(t_phasor, h_f_p);
+% g_num_3a  = trapz(t_phasor, h_f_p .* cos(omega_L * t_phasor)) / norm_hf;
+% s_num_3a  = trapz(t_phasor, h_f_p .* sin(omega_L * t_phasor)) / norm_hf;
+% tau_from_phasor_num = s_num_3a / (omega_L * g_num_3a);
+% 
+% fprintf('=== Task 3a: Phasor Verification (tau = %.1f ns) ===\n', tau);
+% fprintf('Theoretical: g=%.4f  s=%.4f  tau=%.4f ns\n', ...
+%         g_theory_3a, s_theory_3a, tau_from_phasor_theory);
+% fprintf('Numerical:   g=%.4f  s=%.4f  tau=%.4f ns\n\n', ...
+%         g_num_3a, s_num_3a, tau_from_phasor_num);
+% 
+% % Universal semicircle: all single-exponential lifetimes lie on this curve
+% theta_sc = linspace(0, pi, 500);
+% g_sc = 0.5 + 0.5*cos(theta_sc);
+% s_sc = 0.5*sin(theta_sc);
+% 
+% % Mark several tau values on the semicircle for reference
+% tau_marks = [0.2, 0.4, 0.8, 1.0, 2.0, 4.0, 8.0];
+% 
+% fig8 = figure('Name','Task 3a: Phasor Diagram','NumberTitle','off', ...
+%               'Position',[50 50 700 500]);
+% plot(g_sc, s_sc, 'k-', 'LineWidth', 2); hold on;
+% 
+% for tm = tau_marks
+%     g_tm = 1 / (1 + (omega_L*tm)^2);
+%     s_tm = (omega_L*tm) / (1 + (omega_L*tm)^2);
+%     plot(g_tm, s_tm, 'ko', 'MarkerSize', 6, 'MarkerFaceColor', [0.7 0.7 0.7]);
+%     text(g_tm + 0.02, s_tm + 0.01, sprintf('%.1f ns', tm), 'FontSize', 8);
+% end
+% 
+% plot(g_theory_3a, s_theory_3a, 'ro', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
+% plot(g_num_3a,    s_num_3a,    'b+', 'MarkerSize', 12, 'LineWidth', 2.5);
+% 
+% xlabel('g  (in-phase component)', 'FontSize', 11);
+% ylabel('s  (quadrature component)', 'FontSize', 11);
+% title(sprintf('Phasor Diagram — \\tau = %.1f ns lies on the universal semicircle', tau), ...
+%       'FontSize', 11);
+% legend('Universal semicircle','Lifetime labels','Theoretical','Numerical', ...
+%        'Location','northwest');
+% grid on; axis equal; xlim([0, 1]); ylim([0, 0.6]);
+% 
+% sgtitle('Task 3a: Phasor Components g and s', ...
+%         'FontSize', 13, 'FontWeight', 'bold');
 
 
 %% =========================================================================
