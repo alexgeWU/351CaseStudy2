@@ -181,7 +181,27 @@ Multi-exponential or mixed-species pixels fall \emph{inside} the
 semicircle at the intensity-weighted average of each species' coordinates.
 
 \subsubsection{Per-Pixel Implementation for FLIM Data}
+For time-domain TCSPC data, the continuous integrals become discrete
+sums over the photon-count histogram $h_{x,y}[n]$ at pixel $(x,y)$:
 
+\begin{align}
+    g_{x,y} &= \frac{\displaystyle\sum_{n=0}^{N_t-1}
+                     h_{x,y}[n]\,\cos(\omega_L t_n)}
+                    {\displaystyle\sum_{n=0}^{N_t-1} h_{x,y}[n]},
+    \label{eq:g_discrete} \\[4pt]
+    s_{x,y} &= \frac{\displaystyle\sum_{n=0}^{N_t-1}
+                     h_{x,y}[n]\,\sin(\omega_L t_n)}
+                    {\displaystyle\sum_{n=0}^{N_t-1} h_{x,y}[n]},
+    \label{eq:s_discrete}
+\end{align}
+
+where $t_n = n\,\Delta t$, $\Delta t = 0.128\,\text{ns}$, and
+$\omega_L = 2\pi/T_L = 2\pi/12.5\,\text{rad/ns}$.
+The MATLAB implementation reshapes the $512\times512\times N_t$ data
+cube into an $(N_\text{pix}\times N_t)$ matrix and computes both sums
+as single matrix--vector multiplies, avoiding any pixel-by-pixel loop.
+Pixels with fewer than 10 detected photons were excluded, and lifetimes
+outside $[0,\,6]\,\text{ns}$ were masked as unphysical.
 
 \section{Results}
 
