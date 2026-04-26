@@ -22,7 +22,7 @@ T_L     = 12.5e-9;      % Laser period
 f_L     = 1 / T_L;      % Laser frequency 
 omega_L = 2*pi * f_L;   % Laser angular frequency 
 T_S     = 0.2e-9;       % ADC sampling period [ns]
-dt      = 0.001e-9;      % small DT to simulate CT
+dt      = 0.001e-9;     % small DT to simulate CT
 
 %% Task 1
 % *Part a* 
@@ -64,6 +64,7 @@ t_discrete = t(1 : step_size : end); % Time vector for plotting the discrete poi
 % Plot functions
 fig1 = figure('Name','Task 1a: Time-Domain Signals','NumberTitle','off', ...
               'Position',[50 50 900 750]);
+
 % Excitation
 subplot(5,1,1);
 stem(t * 1e9, x * dt, 'filled', 'MarkerSize', 4, 'Color', [0.2 0.4 0.8]);
@@ -107,8 +108,8 @@ sgtitle('Task 1a: Time-Domain Signal Chain', 'FontSize', 13, 'FontWeight', 'bold
 
 % Numerical frequency response via DFT
 N = length(h_f);
-H_f_num = fft(h_f) * T_S; % Scale by T_S for continuous-FT approximation
-f_axis = (0 : N-1) / (N * T_S);   
+H_f_num = fft(h_f) * dt; % Scale by T_S for continuous-FT approximation
+f_axis = (0 : N-1) / (N * dt);   
 
 % Theoretical frequency response at the same frequencies
 omega_axis = 2*pi * f_axis;  
@@ -155,10 +156,15 @@ for k = 1 : 3
     % Build detector IRF for this scenario
     h_dk = zeros(size(t));
     mask_k = (t >= t0_vals(k));
-    h_dk(mask_k) = exp(-(t(mask_k) - t0_vals(k)) / sigma_vals(k));
+    h_dk(mask_k) = exp(-(t(mask_k) - t0_vals(k)).^2 / sigma_vals(k)^2);
+    
+    % Detector output
+    d_full = conv(f, h_d) * dt;
+    d = d_full(1 : length(t));
+
 
     % Convolve fluorescence with this detector
-    dk_full = conv(f, h_dk) * T_S;
+    dk_full = conv(f, h_dk) * dt;
     dk = dk_full(1 : length(t));
 
     % Top row: detector IRFs
