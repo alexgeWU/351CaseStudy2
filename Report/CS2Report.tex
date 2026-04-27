@@ -39,7 +39,25 @@ age@wustl.edu}
 \maketitle
 
 \begin{abstract}
-
+This paper presents an analysis of fluorescence
+lifetime imaging microscopy (FLIM) through three interconnected tasks.
+In Task~1 the full time-domain detection of a fluorescence system with
+a sufficiently fast detector is modeled from pulsed excitation to 
+ditization with an analog-to-digital converter (ADC). Then the fluoorescence frequency response
+is verified numerically against the theoretical frequency response of a
+single-exponential decay. We then analyze the impact of different
+detector impulse response functions (IRFs) on the digitized output 
+signal. In Task~2, we demonstrate that direct 100\,kHz sampling of an
+80\,MHz fluorescence signal is impossible due to aliasing, then show
+that heterodyne mixing to a 1\,kHz intermediate frequency recovers
+the original phase shift and modulation depth, yielding an estimated
+lifetime of $\tau \approx 1\,\text{ns}$ from both observables.
+In Task~3, phasor analysis is derived analytically and applied
+pixel-by-pixel to a $512\times512$ TCSPC dataset of NAD(P)H in breast
+cancer cells, producing a spatially-resolved lifetime image and a phasor
+plot that separates free NAD(P)H ($\tau \lesssim 0.5\,\text{ns}$) from
+protein-bound NAD(P)H ($\tau \sim 1$--$3\,\text{ns}$), reflecting the
+metabolic heterogeneity of the cell population.
 \end{abstract}
 
 \section{Background}
@@ -81,16 +99,85 @@ every pixel of a field of view, producing a spatially-resolved map of
 biochemical state.
 
 The emitted fluorescence $f(t)$ is collected by a photomultiplier
-tube (PMT) with its own impulse response $h_d(t)$, then sampled by an
-ADC at period $T_S$.
+tube (PMT) with its own impulse response $h_d(t)$, That is then sampled by an ADC.
 Depending on the available hardware, lifetime information can be
 extracted from time-domain exponential fitting, frequency-domain phase
 and modulation analysis, or the phasor approach explored in this
 study~\cite{Gadella1993,Digman2008}.
 
 \section{Methods}
-
 \subsection{Task 1: Fast Time-Domain Detection}
+\subsubsection{Time Domain Signal Simulation}
+
+Continuous-time convolution is the mathematical operation used to model the signal processing of the fluorescence system. 
+Given two continuous-time signals $x(t)$ and $h(t)$, their convolution is defined as:
+\begin{equation}
+    y(t) = x(t) * h(t) = \int_{-\infty}^{\infty} x(\tau) h(t - \tau) d\tau
+\end{equation}
+where the output signal $y(t)$ is the result of convolving the input signal $x(t)$ with the system's impulse response function $h(t)$.
+We simulated an ideal fluorescence system as a cascade of LTI systems: an inititial pulsed excitation $x(t)$ convolved with the fluorescence IRF $h_f(t)$,
+then convolved with the detector IRF $h_d(t)$, and finally sampled by an ADC $p(t)$.
+The fluorescence system was simulated over a 125 ns window in continuous time using a high-resolution time step ($dt = 0.001\,\text{ns}$). 
+The pulsed laser excitation was modeled as an impulse train $x(t)$:
+\begin{equation}
+    x(t) = \sum_{n=-\infty}^{\infty} \delta(t - nT_L)
+    \label{eq:xl}
+\end{equation}
+where $T_L = 12.5\,\text{ns}$ is the pulse repetition period. 
+To accurately approximate the continuous-time function $\delta(t)$ in a discrete MATLAB array, the impulses were generated with an amplitude of $1/dt$.
+This ensures that the mathematical area under each discrete pulse over one time step evaluates to exactly 1 (i.e., $(1/dt) \times dt = 1$), properly preserving the energy of the theoretical excitation pulse. 
+
+The fluorescence emission $f(t)$ was computed by a convolution of $x(t)$ with the fluorescence IRF $h_f(t)$ from \eqref{eq:hf},
+with a fluorescence lifetime of $\tau = 1\,\text{ns}$. In MATLAB, the continuous-time integral was approximated digitally by scaling the discrete convolution by our time step $dt$.
+
+
+The emitted fluorescence was then convolved with a detector IRF to model the PMT:
+\begin{equation}
+    h_d(t) = e^{-(t-t_0)^2/\sigma_t^2} \, u(t)
+    \label{eq:hd}
+\end{equation}
+Where $h_d(t)$ is a Gaussian distribution made causal by multiplying by the unit step function $u(t)$ used to model the detector IRF.
+The variables $\sigma_t$ and $t_0$ represent the width and time offset of the Gaussian distribution, respectively.
+For this ideal system, the width of the Gaussian distribution $\sigma_t$ was set to $0.1$ ns, and the time offset $t_0$ was set to $0.175$ ns.
+The convolution produces the detector output $d(t)$. In this section there is no extra processing of the signal, so the continuous system output $y(t)$ is equal to $d(t)$.
+Finally, the continuous signal was modeled as being sampled by an ADC. The process is represented by multiplying the continuous signal with an impulse train $p(t)$:
+\begin{equation}
+    p(t) = \sum_{m=-\infty}^{\infty} \delta(t - mT_S)
+    \label{eq:pt}
+\end{equation}
+where $T_s = 0.2\,\text{ns}$ is the sampling period. This yields the discrete-time digitized output signal $y[n] = y(nT_s)$.
+
+\subsubsection{Frequency Response Verification}
+
+To validate our time-domain convolution model, we derived the theoretical continuous-time frequency response of the fluorescence IRF $h_f(t)$ from \eqref{eq:hf}.
+The Fourier transform is evaluated as follows:
+$$
+    H_f(j\omega) = \int_{0}^{\infty} e^{-t/\tau} e^{-j\omega t} dt = \int_{0}^{\infty} e^{-t\left(\frac{1}{\tau} + j\omega\right)} dt
+$$
+Evaluating the integral limits yields:
+$$
+    H_f(j\omega) = \left[ \frac{-1}{\frac{1}{\tau} + j\omega} e^{-t\left(\frac{1}{\tau} + j\omega\right)} \right]_{0}^{\infty} = \frac{1}{\frac{1}{\tau} + j\omega}
+$$
+Multiplying the numerator and denominator by $\tau$ gives the final expression:
+\begin{equation}
+    H_f(j\omega) = \frac{\tau}{1 + j\omega\tau}
+    \label{eq:Hf}
+\end{equation}
+The theoretical magnitude and phase of $H_f(j\omega)$ are therefore:
+\begin{align}
+    |H_f(j\omega)| &= \frac{\tau}{\sqrt{1 + (\omega\tau)^2}}, \label{eq:Hf_mag} \\
+    \angle H_f(j\omega) &= -\arctan(\omega\tau). \label{eq:Hf_phase}
+\end{align}
+We then computed the numerical Fourier transform of the simulated fluorescence signal $f(t)$ using MATLAB's Fast Fourier Transform (FFT).
+To circumvent the phase plot periodicity from the discrete nature of a FFT, the $dt$ step was replaced with a finer step $dt_{fine}=dt/100$ for the Fourier transform,
+and the plots were zoomed in to the range where the phase wrapping is not apparent.
+This is because computers are inherently discrete, and the FFT assumes periodicity in the signal, which can lead to phase wrapping if the frequency resolution is not sufficiently high.
+
+\subsection{Detector IRF Impact Analysis}
+To characterize the effect of detection hardware on the measured signal,
+the convolution and sampling processes for $y[n]$ were repeated across three different $h_d(t)$:
+fast ($\sigma_t = 0.1\,\text{ns}, t_0=0.175\,\text{ns}$), medium ($\sigma_t = 2.5\,\text{ns}, t_0=4\,\text{ns}$), and slow ($\sigma_t = 10\,\text{ns}, t_0=17\,\text{ns}$).
+
 
 
 \subsection{Task 2: Heterodyne Detection}
@@ -162,12 +249,91 @@ Multi-exponential or mixed-species pixels fall \emph{inside} the
 semicircle at the intensity-weighted average of each species' coordinates.
 
 \subsubsection{Per-Pixel Implementation for FLIM Data}
+For time-domain TCSPC data, the continuous integrals become discrete
+sums over the photon-count histogram $h_{x,y}[n]$ at pixel $(x,y)$:
 
+\begin{align}
+    g_{x,y} &= \frac{\displaystyle\sum_{n=0}^{N_t-1}
+                     h_{x,y}[n]\,\cos(\omega_L t_n)}
+                    {\displaystyle\sum_{n=0}^{N_t-1} h_{x,y}[n]},
+    \label{eq:g_discrete} \\[4pt]
+    s_{x,y} &= \frac{\displaystyle\sum_{n=0}^{N_t-1}
+                     h_{x,y}[n]\,\sin(\omega_L t_n)}
+                    {\displaystyle\sum_{n=0}^{N_t-1} h_{x,y}[n]},
+    \label{eq:s_discrete}
+\end{align}
+
+where $t_n = n\,\Delta t$, $\Delta t = 0.128\,\text{ns}$, and
+$\omega_L = 2\pi/T_L = 2\pi/12.5\,\text{rad/ns}$.
+The MATLAB implementation reshapes the $512\times512\times N_t$ data
+cube into an $(N_\text{pix}\times N_t)$ matrix and computes both sums
+as single matrix--vector multiplies, avoiding any pixel-by-pixel loop.
+Pixels with fewer than 10 detected photons were excluded, and lifetimes
+outside $[0,\,6]\,\text{ns}$ were masked as unphysical.
 
 \section{Results}
 
 \subsection{Task 1: Fast Time-Domain Detection}
 
+\subsubsection{Time-Domain Signals}
+The simulation of the cascaded systems successfully modeled the fluorescence detection process, as shown in Figure \ref{fig:task1a}.
+The initial excitation $x(t)$ acts as a clean impulse train with a $12.5\,\text{ns}$ period.
+The resulting emitted fluorescence $f(t)$ demonstrates a repeated sharp single-exponential decay that effectively reaches zero before the subsequent pulse.
+
+Because the baseline detector IRF was highly precise ($\sigma_t = 0.1\,\text{ns}$),
+the continuous detector output $d(t)$ and the overall system output $y(t)$ preserved the rapid exponential decay of $f(t)$ with minimal blur over time, and a slight offset due to the time delay $t_0$.
+Finally, the digitized output $y[n]$ accurately captured shape of the fluorescence decay, with a sampling period of $T_S = 0.2\,\text{ns}$ that is sufficiently fast to resolve the $1\,\text{ns}$ lifetime.
+
+% [Insert Figure containing Task 1a time-domain subplots here]
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=\textwidth]{images/task1a_time_domain.png}
+%     \caption{Time-domain signal progression from excitation $x(t)$ to the sampled output $y[n]$ using a fast detector.}
+%     \label{fig:task1a}
+% \end{figure}
+
+\subsubsection{Fluorescence Frequency Response}
+To verify the integrity of the numerical convolution, the frequency response (magnitude and phase) of the simulated fluorescence IRF \eqref{eq:hf} was compared against the theoretical continuous-time derivation \eqref{eq:Hf}.
+As depicted in Figure \ref{fig:task1b}, the numerical FFT of $f(t)$ closely tracks the theoretical magnitude $|H_f(j\omega)|$ and phase $\angle H_f(j\omega)$ plots derived
+in \eqref{eq:Hf_mag} and \eqref{eq:Hf_phase}. 
+
+The magnitude plot exhibits the expected low-pass characteristic of an exponential decay, peaking at DC ($\omega = 0$) and rolling off symmetrically at higher frequencies, with the numerical approximation aligning near-perfectly with the theory.
+Correspondingly, the phase transitions smoothly from $90^\circ$ at negative frequencies, through $0^\circ$ at DC, down to $-90^\circ$ at positive frequencies, again matching the theoretical prediction.
+This agreement confirms that the time-domain convolution correctly captures the system's behavior in both domains, validating the numerical implementation of the fluorescence model.
+
+% [Insert Figure containing Task 1b Magnitude and Phase plots here]
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=\textwidth]{images/task1b_frequency_response.png}
+%     \caption{Comparison of the numerical FFT and theoretical frequency response $H_f(j\omega)$ of the fluorescence emission.}
+%     \label{fig:task1b}
+% \end{figure}
+
+\subsection{Detector IRF Impact on Lifetime Estimation}
+While the fast detector accurately reproduced the fluorescence decay, other detector IRFs with broader impulse responses can significantly distort the measured signal in the time domain.
+Figure \ref{fig:task1c} illustrates the digitized output $y[n]$ across fast, medium, and slow detector IRFs, and the $h_d(t)$'s for each case show how they get wider in time.
+
+As the detector width $\sigma_t$ increases, the individual measured pulses of $y[n]$ become visibly wider in time. For the medium detector ($\sigma_t = 2.5\,\text{ns}$),
+the temporal broadening is severe enough that adjacent pulses begin to stretch and almost touch each other. For the slow detector ($\sigma_t = 10.0\,\text{ns}$), the hardware response completely dominates the signal.
+Because the detector's decay is much slower than the $12.5\,\text{ns}$ laser repetition period, the consecutive pulses pile up on top of one another, resulting in an almost continuous DC-like offset with only a slight ripple.
+The underlying fluorescence decay is entirely obscured.
+
+\textbf{Impact on Estimation and Corrections:} 
+If an exponential decay model is directly fitted to the $y[n]$ from a medium or slow detector, the fluorescence lifetime $\tau$ will be drastically overestimated,
+as the fit will capture the detector's sluggish response rather than the fluorophore's true emission. 
+The solution is to apply a more complex curve fitting process. 
+A way to do this is to have prior knowledge of the detectors IRF from an instantaneous measurement of the system's response to a known short-lifetime fluorophore,
+along with other system parameters such as the time offset of measured signals \cite{Datta2020}. 
+Analysis of the estimated signal convoluted with the IRF compared to the experimental data can be used to iteratively optimize the fit parameters.
+This can be achieved with $\chi^2$ minimization to recover the true lifetime $\tau$ \cite{Datta2020}.
+
+% [Insert Figure containing Task 1c Detector IRF comparisons here]
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=\textwidth]{images/task1c_detector_impact.png}
+%     \caption{The impact of fast, medium, and slow detector instrument response functions (IRFs) on the digitized signal $y[n]$.}
+%     \label{fig:task1c}
+% \end{figure}
 
 \subsection{Task 2: Heterodyne Detection}
 
@@ -271,6 +437,30 @@ or global fitting~\cite{Gadella1993}.
 
 \section{Conclusion}
 
+This study applied LTI system theory to three distinct fluorescence
+lifetime measurement scenarios, each illustrating a different
+relationship between physical signal processing and biological
+information extraction.
+In the time domain, the convolution chain faithfully reproduced the
+pulsed-FLIM signal; the detector IRF was identified as the dominant
+source of lifetime overestimation when $\sigma_t$ is comparable to
+$\tau$, requiring deconvolution to recover the true decay.
+Heterodyne detection resolved the 80\,MHz
+fluorescence signal being undetectable by a 100\,kHz ADC by mixing
+to a 1\,kHz beat frequency, both the phase shift
+$\Delta\varphi = -\arctan(\omega_L\tau)$ and modulation depth
+$M = 1/\sqrt{1+(\omega_L\tau)^2}$ were preserved, independently
+recovering $\tau = 1\,\text{ns}$ with high accuracy.
+Phasor analysis unified the frequency-domain perspective into a
+two-coordinate representation that scales efficiently to imaging
+data; applied to real NAD(P)H TCSPC measurements, it produced a
+lifetime map distinguishing free from protein-bound populations and a
+phasor plot whose interior cloud directly encodes the metabolic state of individual cells
+without a single iterative fit.
+Together, the three tasks demonstrate that the mathematics of
+convolution, Fourier analysis, and inner-product projections are not
+merely abstract tools but the direct computational substrate of
+modern biomedical imaging.
 
 \begin{thebibliography}{00}
 
