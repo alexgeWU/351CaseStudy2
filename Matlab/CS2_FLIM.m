@@ -123,7 +123,7 @@ fig2 = figure('Name','Task 1b: Frequency Response H_f(jw)', ...
 subplot(2,1,1);
 plot(f_axis, abs(H_f_num),    'b-',  'LineWidth', 2.0); hold on;
 plot(f_axis, abs(H_f_theory), 'r--', 'LineWidth', 1.5);
-xlim([-5e11, 5e11]);  % Zoom in to ignore the edges
+xlim([-5e9, 5e9]);  % Zoom in to ignore the edges
 xlabel('Frequency (Hz)'); 
 ylabel('|H_f(j\omega)|');
 title('Magnitude');
@@ -134,7 +134,7 @@ grid on;
 subplot(2,1,2);
 plot(f_axis, angle(H_f_num)*180/pi,    'b-',  'LineWidth', 2.0); hold on;
 plot(f_axis, angle(H_f_theory)*180/pi, 'r--', 'LineWidth', 1.5);
-xlim([-5e11, 5e11]); % Zoom in to ignore the edges
+xlim([-5e9, 5e9]); % Zoom in to ignore the edges
 xlabel('Frequency (Hz)'); 
 ylabel('Phase (degrees)');
 title('Phase');
