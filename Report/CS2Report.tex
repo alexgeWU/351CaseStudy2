@@ -169,9 +169,9 @@ The theoretical magnitude and phase of $H_f(j\omega)$ are therefore:
     \angle H_f(j\omega) &= -\arctan(\omega\tau). \label{eq:Hf_phase}
 \end{align}
 We then computed the numerical Fourier transform of the simulated fluorescence signal $f(t)$ using MATLAB's Fast Fourier Transform (FFT).
-To circumvent the phase plot periodicity from the discrete nature of a FFT, the $dt$ step was replaced with a finer step $dt_{fine}=dt/100$ for the Fourier transform,
-and the plots were zoomed in to the range where the phase wrapping is not apparent.
-This is because computers are inherently discrete, and the FFT assumes periodicity in the signal, which can lead to phase wrapping if the frequency resolution is not sufficiently high.
+The plots were zoomed in to the range where the response was interesting, and phase wrapping was not apparent.
+This is because computers are inherently discrete, and the FFT assumes periodicity in the signal.
+This can lead to phase wrapping if the frequency resolution is not sufficiently high, this is shown when the whole calculated response is plotted.
 
 \subsection{Detector IRF Impact Analysis}
 To characterize the effect of detection hardware on the measured signal,
@@ -298,7 +298,7 @@ As depicted in Figure \ref{fig:task1b}, the numerical FFT of $f(t)$ closely trac
 in \eqref{eq:Hf_mag} and \eqref{eq:Hf_phase}. 
 
 The magnitude plot exhibits the expected low-pass characteristic of an exponential decay, peaking at DC ($\omega = 0$) and rolling off symmetrically at higher frequencies, with the numerical approximation aligning near-perfectly with the theory.
-Correspondingly, the phase transitions smoothly from $90^\circ$ at negative frequencies, through $0^\circ$ at DC, down to $-90^\circ$ at positive frequencies, again matching the theoretical prediction.
+Correspondingly, the phase transitions smoothly from $90^\circ$ at negative frequencies, through $0^\circ$ at DC, down to $-90^\circ$ at positive frequencies, again very closely matching the theoretical prediction.
 This agreement confirms that the time-domain convolution correctly captures the system's behavior in both domains, validating the numerical implementation of the fluorescence model.
 
 % [Insert Figure containing Task 1b Magnitude and Phase plots here]

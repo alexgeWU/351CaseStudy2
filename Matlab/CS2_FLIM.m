@@ -99,17 +99,10 @@ exportgraphics(gcf, '../docs/figs/1atimedomain.jpg');
 
 %% Task 1b - Frequency response H_f(jw): numerical vs. theoretical
 
-dt_fine = dt / 100; 
-
-% Recreate the time vector and the signal using the finer resolution
-max_time = (length(h_f) - 1) * dt; 
-t_fine = 0 : dt_fine : max_time; 
-h_f_fine = exp(-t_fine/tau); 
-
 % Numerical Frequency Response
-N = length(h_f_fine);
-H_f_num = fftshift(fft(h_f_fine)) * dt_fine; 
-f_axis = (-N/2 : N/2-1) / (N * dt_fine);   
+N = length(h_f);
+H_f_num = fftshift(fft(h_f)) * dt; 
+f_axis = (-N/2 : N/2-1) / (N * dt);   
 
 % Theoretical Frequency Response
 omega_axis = 2*pi * f_axis;  
