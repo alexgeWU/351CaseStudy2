@@ -298,8 +298,8 @@ As depicted in Figure \ref{fig:task1b}, the numerical FFT of $f(t)$ closely trac
 in \eqref{eq:Hf_mag} and \eqref{eq:Hf_phase}. 
 
 The magnitude plot exhibits the expected low-pass characteristic of an exponential decay, peaking at DC ($\omega = 0$) and rolling off symmetrically at higher frequencies, with the numerical approximation aligning near-perfectly with the theory.
-Correspondingly, the phase transitions smoothly from $90^\circ$ at negative frequencies, through $0^\circ$ at DC, down to $-90^\circ$ at positive frequencies. 
-However, because the numerical simulation relies on a discrete approximation (using the fine time step $dt_{\text{fine}}$), a slight difference is observable between the numerical phase and the theoretical LTI continuous-time phase.
+Correspondingly, the phase transitions smoothly from $90^\circ$ at negative frequencies, through $0^\circ$ at DC, down to $-90^\circ$ at positive frequencies, again matching the theoretical prediction.
+This agreement confirms that the time-domain convolution correctly captures the system's behavior in both domains, validating the numerical implementation of the fluorescence model.
 
 % [Insert Figure containing Task 1b Magnitude and Phase plots here]
 % \begin{figure}[h]
@@ -311,7 +311,7 @@ However, because the numerical simulation relies on a discrete approximation (us
 
 \subsection{Detector IRF Impact on Lifetime Estimation}
 While the fast detector accurately reproduced the fluorescence decay, other detector IRFs with broader impulse responses can significantly distort the measured signal in the time domain.
-Figure \ref{fig:task1c} illustrates the digitized output $y[n]$ across fast, medium, and slow detector IRFs. 
+Figure \ref{fig:task1c} illustrates the digitized output $y[n]$ across fast, medium, and slow detector IRFs, and the $h_d(t)$'s for each case show how they get wider in time.
 
 As the detector width $\sigma_t$ increases, the individual measured pulses of $y[n]$ become visibly wider in time. For the medium detector ($\sigma_t = 2.5\,\text{ns}$),
 the temporal broadening is severe enough that adjacent pulses begin to stretch and almost touch each other. For the slow detector ($\sigma_t = 10.0\,\text{ns}$), the hardware response completely dominates the signal.
@@ -321,11 +321,11 @@ The underlying fluorescence decay is entirely obscured.
 \textbf{Impact on Estimation and Corrections:} 
 If an exponential decay model is directly fitted to the $y[n]$ from a medium or slow detector, the fluorescence lifetime $\tau$ will be drastically overestimated,
 as the fit will capture the detector's sluggish response rather than the fluorophore's true emission. 
-
-To account for this in the estimation process, the system's IRF $h_d(t)$ must be isolated and measured experimentally
-(for example, by using a purely scattering sample with $\tau \approx 0$). Once $h_d(t)$ is known, standard direct fitting is abandoned in favor of \textit{iterative reconvolution} \cite{Datta2020}.
-In this process, a theoretical exponential decay is mathematically convolved with the measured detector IRF, and the resulting synthetic curve is compared to the measured data $y[n]$.
-The parameter $\tau$ is iteratively adjusted until the synthetic curve matches the data, allowing the true fluorescence lifetime to be decoupled from the hardware-induced temporal broadening \cite{Datta2020}.
+The solution is to apply a more complex curve fitting process. 
+A way to do this is to have prior knowledge of the detectors IRF from an instantaneous measurement of the system's response to a known short-lifetime fluorophore,
+along with other system parameters such as the time offset of measured signals \cite{Datta2020}. 
+Analysis of the estimated signal convoluted with the IRF compared to the experimental data can be used to iteratively optimize the fit parameters.
+This can be achieved with $\chi^2$ minimization to recover the true lifetime $\tau$ \cite{Datta2020}.
 
 % [Insert Figure containing Task 1c Detector IRF comparisons here]
 % \begin{figure}[h]
