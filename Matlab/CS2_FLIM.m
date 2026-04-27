@@ -10,7 +10,6 @@
 %   Task 2c — Phase/modulation lifetime estimation from heterodyne signal
 %   Task 3a — Phasor equations verified on single-exponential IRF
 %   Task 3b — Per-pixel phasor analysis of real FLIM data
-%
 
 close all; clear; clc;
 
@@ -353,151 +352,58 @@ xlim([0 5]);
 exportgraphics(gcf, '../docs/figs/2clifetime.jpg')
 %% TASK 3a: Phasor Equations — Verification on Single Exponential
 
-fs_adc = 100e3;                  % ADC sampling frequency [Hz]
+% Analytical phasor for tau = 1 ns, omega_L in rad/ns
+g_theory_3a = 1 / (1 + (omega_L * tau)^2);
+s_theory_3a = (omega_L * tau) / (1 + (omega_L * tau)^2);
+tau_from_phasor_theory = s_theory_3a / (omega_L * g_theory_3a);
 
-Ts_adc = 1/fs_adc;
+% Numerical phasor: integrate h_f over one period using trapezoidal rule
+t_phasor  = 0 : 0.001 : T_L;             % Fine grid [ns]
+h_f_p     = exp(-t_phasor / tau);         % IRF samples
 
-t_adc  = t_mid(1):Ts_adc:t_mid(end);
+norm_hf   = trapz(t_phasor, h_f_p);
+g_num_3a  = trapz(t_phasor, h_f_p .* cos(omega_L * t_phasor)) / norm_hf;
+s_num_3a  = trapz(t_phasor, h_f_p .* sin(omega_L * t_phasor)) / norm_hf;
+tau_from_phasor_num = s_num_3a / (omega_L * g_num_3a);
 
-yf_adc = interp1(t_mid, y_f, t_adc, 'linear');
+fprintf('=== Task 3a: Phasor Verification (tau = %.1f ns) ===\n', tau);
+fprintf('Theoretical: g=%.4f  s=%.4f  tau=%.4f ns\n', ...
+        g_theory_3a, s_theory_3a, tau_from_phasor_theory);
+fprintf('Numerical:   g=%.4f  s=%.4f  tau=%.4f ns\n\n', ...
+        g_num_3a, s_num_3a, tau_from_phasor_num);
 
-yx_adc = interp1(t_mid, y_x, t_adc, 'linear');
+% Universal semicircle: all single-exponential lifetimes lie on this curve
+theta_sc = linspace(0, pi, 500);
+g_sc = 0.5 + 0.5*cos(theta_sc);
+s_sc = 0.5*sin(theta_sc);
 
-% Extract phase and amplitude at the beat frequency
+% Mark several tau values on the semicircle for reference
+tau_marks = [0.2, 0.4, 0.8, 1.0, 2.0, 4.0, 8.0];
 
-N = length(t_adc);
+fig8 = figure('Name','Task 3a: Phasor Diagram','NumberTitle','off', ...
+              'Position',[50 50 700 500]);
+plot(g_sc, s_sc, 'k-', 'LineWidth', 2); hold on;
 
-Yf = fft(yf_adc);
+for tm = tau_marks
+    g_tm = 1 / (1 + (omega_L*tm)^2);
+    s_tm = (omega_L*tm) / (1 + (omega_L*tm)^2);
+    plot(g_tm, s_tm, 'ko', 'MarkerSize', 6, 'MarkerFaceColor', [0.7 0.7 0.7]);
+    text(g_tm + 0.02, s_tm + 0.01, sprintf('%.1f ns', tm), 'FontSize', 8);
+end
 
-Yx = fft(yx_adc);
+plot(g_theory_3a, s_theory_3a, 'ro', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
+plot(g_num_3a,    s_num_3a,    'b+', 'MarkerSize', 12, 'LineWidth', 2.5);
 
-k = round(delta_f*N/fs_adc) + 1;  % MATLAB index for beat bin
+xlabel('g  (in-phase component)', 'FontSize', 11);
+ylabel('s  (quadrature component)', 'FontSize', 11);
+title(sprintf('Phasor Diagram — \\tau = %.1f ns lies on the universal semicircle', tau), ...
+      'FontSize', 11);
+legend('Universal semicircle','Lifetime labels','Theoretical','Numerical', ...
+       'Location','northwest');
+grid on; axis equal; xlim([0, 1]); ylim([0, 0.6]);
 
-phase_f = angle(Yf(k));
-
-phase_x = angle(Yx(k));
-
-delta_phi = angle(exp(1j*(phase_f - phase_x)));  % wrapped phase difference
-
-delta_M   = abs(Yf(k)) / abs(Yx(k));             % modulation ratio
-
-% Estimate lifetime
-
-tau_phase = -tan(delta_phi)/omega_L;                       % [s]
-
-tau_mod   = sqrt(max(0, 1/delta_M^2 - 1))/omega_L;          % [s]
-
-fprintf('=== Task 2c ===\n');
-
-fprintf('Delta phi = %.4f rad = %.2f deg\n', delta_phi, delta_phi*180/pi);
-
-fprintf('Delta M   = %.4f\n', delta_M);
-
-fprintf('Tau from phase      = %.4f ns\n', tau_phase*1e9);
-
-fprintf('Tau from modulation = %.4f ns\n', tau_mod*1e9);
-
-fprintf('True tau            = %.4f ns\n', tau*1e9);
-
-% Plot time-domain comparison
-
-figure;
-
-subplot(2,1,1);
-
-plot(t_adc*1e3, yx_adc, 'LineWidth', 1.5); hold on;
-
-plot(t_adc*1e3, yf_adc, 'LineWidth', 1.5);
-
-xlabel('Time (ms)');
-
-ylabel('Amplitude');
-
-title('Reference and Fluorescence Beat Signals');
-
-legend('Excitation reference', 'Fluorescence');
-
-grid on;
-
-% Plot frequency-domain magnitude
-
-f_ax = (0:N-1)*(fs_adc/N);
-
-subplot(2,1,2);
-
-plot(f_ax/1e3, abs(Yx)/N, 'LineWidth', 1.5); hold on;
-
-plot(f_ax/1e3, abs(Yf)/N, 'LineWidth', 1.5);
-
-xlabel('Frequency (kHz)');
-
-ylabel('Magnitude');
-
-title(sprintf('\\Delta\\phi = %.2f^\\circ, \\Delta M = %.3f, \\tau = %.3f ns', ...
-      delta_phi*180/pi, delta_M, tau_phase*1e9));
-
-legend('Excitation reference', 'Fluorescence');
-
-xlim([0 5]);
-
-grid on;
-
-
-
-
-
-% % Analytical phasor for tau = 1 ns, omega_L in rad/ns
-% g_theory_3a = 1 / (1 + (omega_L * tau)^2);
-% s_theory_3a = (omega_L * tau) / (1 + (omega_L * tau)^2);
-% tau_from_phasor_theory = s_theory_3a / (omega_L * g_theory_3a);
-% 
-% % Numerical phasor: integrate h_f over one period using trapezoidal rule
-% t_phasor  = 0 : 0.001 : T_L;             % Fine grid [ns]
-% h_f_p     = exp(-t_phasor / tau);         % IRF samples
-% 
-% norm_hf   = trapz(t_phasor, h_f_p);
-% g_num_3a  = trapz(t_phasor, h_f_p .* cos(omega_L * t_phasor)) / norm_hf;
-% s_num_3a  = trapz(t_phasor, h_f_p .* sin(omega_L * t_phasor)) / norm_hf;
-% tau_from_phasor_num = s_num_3a / (omega_L * g_num_3a);
-% 
-% fprintf('=== Task 3a: Phasor Verification (tau = %.1f ns) ===\n', tau);
-% fprintf('Theoretical: g=%.4f  s=%.4f  tau=%.4f ns\n', ...
-%         g_theory_3a, s_theory_3a, tau_from_phasor_theory);
-% fprintf('Numerical:   g=%.4f  s=%.4f  tau=%.4f ns\n\n', ...
-%         g_num_3a, s_num_3a, tau_from_phasor_num);
-% 
-% % Universal semicircle: all single-exponential lifetimes lie on this curve
-% theta_sc = linspace(0, pi, 500);
-% g_sc = 0.5 + 0.5*cos(theta_sc);
-% s_sc = 0.5*sin(theta_sc);
-% 
-% % Mark several tau values on the semicircle for reference
-% tau_marks = [0.2, 0.4, 0.8, 1.0, 2.0, 4.0, 8.0];
-% 
-% fig8 = figure('Name','Task 3a: Phasor Diagram','NumberTitle','off', ...
-%               'Position',[50 50 700 500]);
-% plot(g_sc, s_sc, 'k-', 'LineWidth', 2); hold on;
-% 
-% for tm = tau_marks
-%     g_tm = 1 / (1 + (omega_L*tm)^2);
-%     s_tm = (omega_L*tm) / (1 + (omega_L*tm)^2);
-%     plot(g_tm, s_tm, 'ko', 'MarkerSize', 6, 'MarkerFaceColor', [0.7 0.7 0.7]);
-%     text(g_tm + 0.02, s_tm + 0.01, sprintf('%.1f ns', tm), 'FontSize', 8);
-% end
-% 
-% plot(g_theory_3a, s_theory_3a, 'ro', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
-% plot(g_num_3a,    s_num_3a,    'b+', 'MarkerSize', 12, 'LineWidth', 2.5);
-% 
-% xlabel('g  (in-phase component)', 'FontSize', 11);
-% ylabel('s  (quadrature component)', 'FontSize', 11);
-% title(sprintf('Phasor Diagram — \\tau = %.1f ns lies on the universal semicircle', tau), ...
-%       'FontSize', 11);
-% legend('Universal semicircle','Lifetime labels','Theoretical','Numerical', ...
-%        'Location','northwest');
-% grid on; axis equal; xlim([0, 1]); ylim([0, 0.6]);
-% 
-% sgtitle('Task 3a: Phasor Components g and s', ...
-%         'FontSize', 13, 'FontWeight', 'bold');
+sgtitle('Task 3a: Phasor Components g and s', ...
+        'FontSize', 13, 'FontWeight', 'bold');
 
 
 %% TASK 3b: Phasor Analysis of Real FLIM Data
