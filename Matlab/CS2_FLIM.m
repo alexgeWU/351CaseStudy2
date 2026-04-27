@@ -14,15 +14,13 @@
 
 close all; clear; clc;
 
-%%
-
-% Parameters 
+%% Parameters 
 tau     = 1e-9;         % Fluorescence lifetime
 T_L     = 12.5e-9;      % Laser period 
 f_L     = 1 / T_L;      % Laser frequency 
 omega_L = 2*pi * f_L;   % Laser angular frequency 
 T_S     = 0.2e-9;       % ADC sampling period [ns]
-dt      = 0.001e-9;      % small DT to simulate CT
+dt      = 0.001e-9;     % small DT to simulate CT
 
 %% Task 1a - Time-domain signals (excitation, fluorescence, detection)
 
@@ -45,11 +43,9 @@ f_full = conv(x, h_f) * dt;
 f = f_full(1 : length(t));
 
 % Detector IRF
-sigma_t = 0.3e-9;   % Detector temporal width [ns]  (fast PMT ~300 ps)
-t0      = 1e-9;     % Detector time delay [ns]
-h_d     = zeros(size(t));
-mask    = (t >= t0);
-h_d(mask) = exp(-(t(mask) - t0).^2 / sigma_t^2);   % Zero before t0 (causal)
+sigma_t = 0.1e-9;
+t0      = 0.175e-9;
+h_d = exp(-(t - t0).^2 / sigma_t^2);
 
 % Detector output
 d_full = conv(f, h_d) * dt;
@@ -58,7 +54,7 @@ d = d_full(1 : length(t));
 % Analog-to-Digital Conversion
 step_size  = round(T_S / dt);
 y_n        = d(1 : step_size : end);
-t_discrete = t(1 : step_size : end); % Time vector for plotting the discrete points
+t_discrete = t(1 : step_size : end);
 
 % Plot functions
 fig1 = figure('Name','Task 1a: Time-Domain Signals','NumberTitle','off', ...
@@ -67,69 +63,81 @@ fig1 = figure('Name','Task 1a: Time-Domain Signals','NumberTitle','off', ...
 subplot(5,1,1);
 stem(t * 1e9, x * dt, 'filled', 'MarkerSize', 4, 'Color', [0.2 0.4 0.8]);
 xlabel('Time (ns)'); ylabel('x(t)');
-title('Excitation x(t): Impulse Train at 80 MHz');
+title('x(t): Excitation');
 grid on; xlim([0,120]);
 
 % Emission
 subplot(5,1,2);
 plot(t * 1e9, f, 'b', 'LineWidth', 1.5);
 xlabel('Time (ns)'); ylabel('f(t)');
-title(sprintf('Emitted Fluorescence f(t): Single-Exp Decay, \\tau = %.1f ns', tau * 1e9));
+title('f(t): Emitted Fluorescence');
 grid on; xlim([0,120]);
 
 % Continuous Detector Output
 subplot(5,1,3);
 plot(t * 1e9, d, 'Color', [0.1 0.6 0.1], 'LineWidth', 1.5);
 xlabel('Time (ns)'); ylabel('d(t)');
-title('Continuous Detector Output d(t) = f(t) * h_d(t)');
+title('d(t): Detector Output');
 grid on; xlim([0,120]);
 
 % Continuous Output
 subplot(5,1,4);
 plot(t * 1e9, d, 'Color', [0.6 0.1 0.6], 'LineWidth', 1.5);
-xlabel('Time (ns)'); ylabel('y[n]');
-title('Continuous Output y(t) = d(t)');
+xlabel('Time (ns)'); ylabel('y(t)');
+title('y(t): Continuous System Output');
 grid on; xlim([0,120]);
 
 % Digitized Output
 subplot(5,1,5);
-% Overlay the continuous signal lightly behind the discrete samples
 stem(t_discrete * 1e9, y_n, 'filled', 'MarkerSize', 4, 'Color', [0.6 0.1 0.6]);
 xlabel('Time (ns)'); ylabel('y[n]');
-title(sprintf('Sampled Signal y[n] at T_S = %.1f ns  (5 GS/s ADC)', T_S * 1e9));
+title('y[n]: Digitized System Output');
 grid on; xlim([0,120]);
 
-sgtitle('Task 1a: Time-Domain Signal Chain', 'FontSize', 13, 'FontWeight', 'bold');
+sgtitle('Task 1a: Time-Domain Signals', 'FontSize', 13, 'FontWeight', 'bold');
+
 exportgraphics(gcf, '../docs/figs/1atimedomain.jpg');
 
 %% Task 1b - Frequency response H_f(jw): numerical vs. theoretical
 
-% Numerical frequency response via DFT
-N = length(h_f);
-H_f_num = fft(h_f) * T_S; % Scale by T_S for continuous-FT approximation
-f_axis = (0 : N-1) / (N * T_S);   
+dt_fine = dt / 100; 
 
-% Theoretical frequency response at the same frequencies
+% Recreate the time vector and the signal using the finer resolution
+max_time = (length(h_f) - 1) * dt; 
+t_fine = 0 : dt_fine : max_time; 
+h_f_fine = exp(-t_fine/tau); 
+
+% Numerical Frequency Response
+N = length(h_f_fine);
+H_f_num = fftshift(fft(h_f_fine)) * dt_fine; 
+f_axis = (-N/2 : N/2-1) / (N * dt_fine);   
+
+% Theoretical Frequency Response
 omega_axis = 2*pi * f_axis;  
 H_f_theory = tau ./ (1 + 1j * omega_axis * tau);
 
-% Plot frequency responses
 fig2 = figure('Name','Task 1b: Frequency Response H_f(jw)', ...
     'NumberTitle','off', 'Position',[50 50 900 550]);
 
+% Magnitude
 subplot(2,1,1);
 plot(f_axis, abs(H_f_num),    'b-',  'LineWidth', 2.0); hold on;
 plot(f_axis, abs(H_f_theory), 'r--', 'LineWidth', 1.5);
-xlabel('Frequency (GHz)'); ylabel('|H_f(j\omega)|');
-title('Magnitude — Numerical FFT vs. Theoretical \tau/(1+j\omega\tau)');
+xlim([-5e11, 5e11]);  % Zoom in to ignore the edges
+xlabel('Frequency (Hz)'); 
+ylabel('|H_f(j\omega)|');
+title('Magnitude');
 legend('Numerical FFT', 'Theoretical');
 grid on;
 
+% Phase
 subplot(2,1,2);
 plot(f_axis, angle(H_f_num)*180/pi,    'b-',  'LineWidth', 2.0); hold on;
 plot(f_axis, angle(H_f_theory)*180/pi, 'r--', 'LineWidth', 1.5);
-xlabel('Frequency (GHz)'); ylabel('Phase (degrees)');
-title('Phase — Numerical FFT vs. Theoretical  \angle H_f = -atan(\omega\tau)');
+xlim([-5e11, 5e11]); % Zoom in to ignore the edges
+xlabel('Frequency (Hz)'); 
+ylabel('Phase (degrees)');
+title('Phase');
 legend('Numerical FFT', 'Theoretical');
 grid on;
 
@@ -139,40 +147,50 @@ exportgraphics(gcf, '../docs/figs/1bfreqresponse.jpg');
 
 %% Task 1c - Effect of detector IRF on sampled signal y[n]
 
-% Three detector scenarios: fast, medium, slow
-sigma_vals = [0.1e-9,  2.5e-9,  10.0e-9]; % Detector widths
-t0_vals = [0.3e-9,  1.0e-9,  2.5e-9];     % Time delays 
+%             fast,     medium,  slow   detectors
+sigma_vals = [0.1e-9,   2.5e-9,  10.0e-9];
+t0_vals =    [0.175e-9, 4e-9,    17e-9];
 colors = {[0 0.4 1], [0.1 0.7 0.1], [0.8 0.1 0.1]};
-labels = {'\sigma_t=0.1 ns (fast)',  ...
-          '\sigma_t=2.5 ns (medium)', ...
-          '\sigma_t=10.0 ns (slow)'};
+labels = {'\sigma_t=0.1 ns, t_0=0.175 ns (fast)',  ...
+          '\sigma_t=2.5 ns, t_0=4 ns (medium)', ...
+          '\sigma_t=10.0 ns, t_0=17 ns (slow)'};
 
 fig3 = figure('Name','Task 1c: Detector IRF Impact','NumberTitle','off', ...
               'Position',[50 50 1100 600]);
 
 for k = 1 : 3
-    % Build detector IRF for this scenario
-    h_dk = zeros(size(t));
-    mask_k = (t >= t0_vals(k));
-    h_dk(mask_k) = exp(-(t(mask_k) - t0_vals(k)) / sigma_vals(k));
+    % Build detector IRF
+    h_dk = exp(-(t - t0_vals(k)).^2 / sigma_vals(k)^2);
 
     % Convolve fluorescence with this detector
-    dk_full = conv(f, h_dk) * T_S;
+    dk_full = conv(f, h_dk) * dt;
     dk = dk_full(1 : length(t));
+    
+    % Digitalize
+    step_size  = round(T_S / dt);
+    y_n        = dk(1 : step_size : end);
+    t_discrete = t(1 : step_size : end);
 
-    % Top row: detector IRFs
+    % Detector IRF
     subplot(2, 3, k);
-    plot(t, h_dk, 'Color', colors{k}, 'LineWidth', 1.8);
+    plot(t, h_dk, 'Color', colors{k}, 'LineWidth', 1);
     xlabel('Time (s)'); ylabel('h_d(t)');
     title(labels{k}); grid on;
+    if k == 1
+        xlim([0,4e-10]);
+    elseif k == 2
+        xlim([0,1e-8]);
+    else
+        xlim([0,4e-8]);
+    end
 
-    % Bottom row: resulting y[n]
+    % y[n]
     subplot(2, 3, k+3);
-    stem(t, dk, 'filled', 'MarkerSize', 2, 'Color', colors{k});
+    stem(t_discrete, y_n, 'Color', colors{k});
     xlabel('Time (s)'); ylabel('y[n]');
-    title(sprintf('y[n]: \\sigma_t=%.1f ns, t_0=%.1f ns', ...
-        sigma_vals(k) * 10^9, t0_vals(k) * 10^9));
+    title('y[n]');
     grid on;
+    xlim([0,125e-9]);
 end
 
 sgtitle({'Detector IRF Impact on y[n]'}, 'FontSize', 12, ...
@@ -335,58 +353,151 @@ xlim([0 5]);
 exportgraphics(gcf, '../docs/figs/2clifetime.jpg')
 %% TASK 3a: Phasor Equations — Verification on Single Exponential
 
-% Analytical phasor for tau = 1 ns, omega_L in rad/ns
-g_theory_3a = 1 / (1 + (omega_L * tau)^2);
-s_theory_3a = (omega_L * tau) / (1 + (omega_L * tau)^2);
-tau_from_phasor_theory = s_theory_3a / (omega_L * g_theory_3a);
+fs_adc = 100e3;                  % ADC sampling frequency [Hz]
 
-% Numerical phasor: integrate h_f over one period using trapezoidal rule
-t_phasor  = 0 : 0.001 : T_L;             % Fine grid [ns]
-h_f_p     = exp(-t_phasor / tau);         % IRF samples
+Ts_adc = 1/fs_adc;
 
-norm_hf   = trapz(t_phasor, h_f_p);
-g_num_3a  = trapz(t_phasor, h_f_p .* cos(omega_L * t_phasor)) / norm_hf;
-s_num_3a  = trapz(t_phasor, h_f_p .* sin(omega_L * t_phasor)) / norm_hf;
-tau_from_phasor_num = s_num_3a / (omega_L * g_num_3a);
+t_adc  = t_mid(1):Ts_adc:t_mid(end);
 
-fprintf('=== Task 3a: Phasor Verification (tau = %.1f ns) ===\n', tau);
-fprintf('Theoretical: g=%.4f  s=%.4f  tau=%.4f ns\n', ...
-        g_theory_3a, s_theory_3a, tau_from_phasor_theory);
-fprintf('Numerical:   g=%.4f  s=%.4f  tau=%.4f ns\n\n', ...
-        g_num_3a, s_num_3a, tau_from_phasor_num);
+yf_adc = interp1(t_mid, y_f, t_adc, 'linear');
 
-% Universal semicircle: all single-exponential lifetimes lie on this curve
-theta_sc = linspace(0, pi, 500);
-g_sc = 0.5 + 0.5*cos(theta_sc);
-s_sc = 0.5*sin(theta_sc);
+yx_adc = interp1(t_mid, y_x, t_adc, 'linear');
 
-% Mark several tau values on the semicircle for reference
-tau_marks = [0.2, 0.4, 0.8, 1.0, 2.0, 4.0, 8.0];
+% Extract phase and amplitude at the beat frequency
 
-fig8 = figure('Name','Task 3a: Phasor Diagram','NumberTitle','off', ...
-              'Position',[50 50 700 500]);
-plot(g_sc, s_sc, 'k-', 'LineWidth', 2); hold on;
+N = length(t_adc);
 
-for tm = tau_marks
-    g_tm = 1 / (1 + (omega_L*tm)^2);
-    s_tm = (omega_L*tm) / (1 + (omega_L*tm)^2);
-    plot(g_tm, s_tm, 'ko', 'MarkerSize', 6, 'MarkerFaceColor', [0.7 0.7 0.7]);
-    text(g_tm + 0.02, s_tm + 0.01, sprintf('%.1f ns', tm), 'FontSize', 8);
-end
+Yf = fft(yf_adc);
 
-plot(g_theory_3a, s_theory_3a, 'ro', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
-plot(g_num_3a,    s_num_3a,    'b+', 'MarkerSize', 12, 'LineWidth', 2.5);
+Yx = fft(yx_adc);
 
-xlabel('g  (in-phase component)', 'FontSize', 11);
-ylabel('s  (quadrature component)', 'FontSize', 11);
-title(sprintf('Phasor Diagram — \\tau = %.1f ns lies on the universal semicircle', tau), ...
-      'FontSize', 11);
-legend('Universal semicircle','Lifetime labels','Theoretical','Numerical', ...
-       'Location','northwest');
-grid on; axis equal; xlim([0, 1]); ylim([0, 0.6]);
+k = round(delta_f*N/fs_adc) + 1;  % MATLAB index for beat bin
 
-sgtitle('Task 3a: Phasor Components g and s', ...
-        'FontSize', 13, 'FontWeight', 'bold');
+phase_f = angle(Yf(k));
+
+phase_x = angle(Yx(k));
+
+delta_phi = angle(exp(1j*(phase_f - phase_x)));  % wrapped phase difference
+
+delta_M   = abs(Yf(k)) / abs(Yx(k));             % modulation ratio
+
+% Estimate lifetime
+
+tau_phase = -tan(delta_phi)/omega_L;                       % [s]
+
+tau_mod   = sqrt(max(0, 1/delta_M^2 - 1))/omega_L;          % [s]
+
+fprintf('=== Task 2c ===\n');
+
+fprintf('Delta phi = %.4f rad = %.2f deg\n', delta_phi, delta_phi*180/pi);
+
+fprintf('Delta M   = %.4f\n', delta_M);
+
+fprintf('Tau from phase      = %.4f ns\n', tau_phase*1e9);
+
+fprintf('Tau from modulation = %.4f ns\n', tau_mod*1e9);
+
+fprintf('True tau            = %.4f ns\n', tau*1e9);
+
+% Plot time-domain comparison
+
+figure;
+
+subplot(2,1,1);
+
+plot(t_adc*1e3, yx_adc, 'LineWidth', 1.5); hold on;
+
+plot(t_adc*1e3, yf_adc, 'LineWidth', 1.5);
+
+xlabel('Time (ms)');
+
+ylabel('Amplitude');
+
+title('Reference and Fluorescence Beat Signals');
+
+legend('Excitation reference', 'Fluorescence');
+
+grid on;
+
+% Plot frequency-domain magnitude
+
+f_ax = (0:N-1)*(fs_adc/N);
+
+subplot(2,1,2);
+
+plot(f_ax/1e3, abs(Yx)/N, 'LineWidth', 1.5); hold on;
+
+plot(f_ax/1e3, abs(Yf)/N, 'LineWidth', 1.5);
+
+xlabel('Frequency (kHz)');
+
+ylabel('Magnitude');
+
+title(sprintf('\\Delta\\phi = %.2f^\\circ, \\Delta M = %.3f, \\tau = %.3f ns', ...
+      delta_phi*180/pi, delta_M, tau_phase*1e9));
+
+legend('Excitation reference', 'Fluorescence');
+
+xlim([0 5]);
+
+grid on;
+
+
+
+
+
+% % Analytical phasor for tau = 1 ns, omega_L in rad/ns
+% g_theory_3a = 1 / (1 + (omega_L * tau)^2);
+% s_theory_3a = (omega_L * tau) / (1 + (omega_L * tau)^2);
+% tau_from_phasor_theory = s_theory_3a / (omega_L * g_theory_3a);
+% 
+% % Numerical phasor: integrate h_f over one period using trapezoidal rule
+% t_phasor  = 0 : 0.001 : T_L;             % Fine grid [ns]
+% h_f_p     = exp(-t_phasor / tau);         % IRF samples
+% 
+% norm_hf   = trapz(t_phasor, h_f_p);
+% g_num_3a  = trapz(t_phasor, h_f_p .* cos(omega_L * t_phasor)) / norm_hf;
+% s_num_3a  = trapz(t_phasor, h_f_p .* sin(omega_L * t_phasor)) / norm_hf;
+% tau_from_phasor_num = s_num_3a / (omega_L * g_num_3a);
+% 
+% fprintf('=== Task 3a: Phasor Verification (tau = %.1f ns) ===\n', tau);
+% fprintf('Theoretical: g=%.4f  s=%.4f  tau=%.4f ns\n', ...
+%         g_theory_3a, s_theory_3a, tau_from_phasor_theory);
+% fprintf('Numerical:   g=%.4f  s=%.4f  tau=%.4f ns\n\n', ...
+%         g_num_3a, s_num_3a, tau_from_phasor_num);
+% 
+% % Universal semicircle: all single-exponential lifetimes lie on this curve
+% theta_sc = linspace(0, pi, 500);
+% g_sc = 0.5 + 0.5*cos(theta_sc);
+% s_sc = 0.5*sin(theta_sc);
+% 
+% % Mark several tau values on the semicircle for reference
+% tau_marks = [0.2, 0.4, 0.8, 1.0, 2.0, 4.0, 8.0];
+% 
+% fig8 = figure('Name','Task 3a: Phasor Diagram','NumberTitle','off', ...
+%               'Position',[50 50 700 500]);
+% plot(g_sc, s_sc, 'k-', 'LineWidth', 2); hold on;
+% 
+% for tm = tau_marks
+%     g_tm = 1 / (1 + (omega_L*tm)^2);
+%     s_tm = (omega_L*tm) / (1 + (omega_L*tm)^2);
+%     plot(g_tm, s_tm, 'ko', 'MarkerSize', 6, 'MarkerFaceColor', [0.7 0.7 0.7]);
+%     text(g_tm + 0.02, s_tm + 0.01, sprintf('%.1f ns', tm), 'FontSize', 8);
+% end
+% 
+% plot(g_theory_3a, s_theory_3a, 'ro', 'MarkerSize', 12, 'MarkerFaceColor', 'r');
+% plot(g_num_3a,    s_num_3a,    'b+', 'MarkerSize', 12, 'LineWidth', 2.5);
+% 
+% xlabel('g  (in-phase component)', 'FontSize', 11);
+% ylabel('s  (quadrature component)', 'FontSize', 11);
+% title(sprintf('Phasor Diagram — \\tau = %.1f ns lies on the universal semicircle', tau), ...
+%       'FontSize', 11);
+% legend('Universal semicircle','Lifetime labels','Theoretical','Numerical', ...
+%        'Location','northwest');
+% grid on; axis equal; xlim([0, 1]); ylim([0, 0.6]);
+% 
+% sgtitle('Task 3a: Phasor Components g and s', ...
+%         'FontSize', 13, 'FontWeight', 'bold');
 
 
 %% TASK 3b: Phasor Analysis of Real FLIM Data
